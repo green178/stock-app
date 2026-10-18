@@ -1,0 +1,51 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>バーコード読み取り</title>
+</head>
+<body>
+  <h1>📷 商品のバーコードを読み取る</h1>
+
+  <div id="reader"></div>
+  <p id="result">読み取り待ち</p>
+
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <script>
+    const scanner = new Html5QrcodeScanner(
+      "reader",
+      { fps: 10, qrbox: 250 },
+      false
+    );
+
+    scanner.render(
+      (barcode) => {
+        document.getElementById("result").textContent =
+          "バーコード番号：" + barcode;
+      
+fetch("https://world.openfoodfacts.org/api/v2/product/" + barcode + ".json")
+  .then(response => response.json())
+  .then(data => {
+    const name = data.product?.product_name_ja ||
+                 data.product?.product_name;
+
+    document.getElementById("result").textContent =
+      name ? "商品名：" + name :
+             "商品名が見つかりません：" + barcode;
+  })
+  .catch(error => {
+    document.getElementById("result").textContent =
+      "商品情報を取得できませんでした";
+  });
+    
+      },
+      (error) => {
+        // 読み取り中は何もしない
+      }
+    );
+  </script>
+</body>
+</html>

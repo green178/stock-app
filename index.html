@@ -1,0 +1,102 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>わが家の在庫管理</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f1f7f4;
+      padding: 20px;
+    }
+    main {
+      background: white;
+      max-width: 500px;
+      margin: auto;
+      padding: 24px;
+      border-radius: 16px;
+    }
+    input, button {
+      padding: 10px;
+      margin: 5px;
+    }
+    li {
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>🏠 わが家の在庫管理</h1>
+    <p>家にある商品を記録しましょう。</p>
+
+    <form id="form">
+      <input id="name" placeholder="商品名" required>
+      <input id="quantity" type="number" min="1"
+             value="1" required>
+      <button type="submit">登録する</button>
+    </form>
+
+    <h2>在庫一覧</h2>
+    <ul id="list"></ul>
+  </main>
+
+  <script>
+    const items = JSON.parse(
+      localStorage.getItem("items") || "[]"
+    );
+
+    function showItems() {
+      const list = document.getElementById("list");
+      list.innerHTML = "";
+
+      items.forEach((item, index) => {
+        const li = document.createElement("li");
+        const label = document.createElement("span");
+        label.textContent = item.name + "：" + item.quantity + "個 ";
+
+        const button = document.createElement("button");
+        button.textContent = "削除";
+        button.onclick = () => {
+          items.splice(index, 1);
+          saveItems();
+        };
+
+        li.append(label, button);
+        list.appendChild(li);
+      });
+    }
+
+    function saveItems() {
+      localStorage.setItem("items", JSON.stringify(items));
+      showItems();
+    }
+
+    document.getElementById("form").onsubmit = (event) => {
+      event.preventDefault();
+
+      const name = document.getElementById("name");
+      const quantity = document.getElementById("quantity");
+
+      
+if (items.some(item => item.name === name.value.trim())) {
+  alert("この商品はすでに在庫にあります。");
+  return;
+}
+
+      items.push({
+        name: name.value.trim(),
+        quantity: Number(quantity.value)
+      });
+
+      saveItems();
+      event.target.reset();
+    };
+
+    showItems();
+  </script>
+</body>
+</html>
