@@ -40,15 +40,19 @@
       <button type="submit">登録する</button>
     </form>
 
-    <h2>在庫一覧</h2>
-    <ul id="list"></ul>
+    <details>
+  <summary>在庫一覧を表示する</summary>
+<ul id="list"></ul>
+<button id="saveQuantityButton" type="button">変更をまとめて保存</button>
+</details>
+    
   </main>
 
   <script>
     const items = JSON.parse(
       localStorage.getItem("items") || "[]"
     );
-
+const pendingQuantities = new Map();
     function showItems() {
       const list = document.getElementById("list");
       list.innerHTML = "";
@@ -61,11 +65,45 @@
         const button = document.createElement("button");
         button.textContent = "削除";
         button.onclick = () => {
-          items.splice(index, 1);
-          saveItems();
-        };
+  if (pendingQuantities.size > 0) {
+    alert("保存していない数量の変更があります。先に「変更をまとめて保存」を押してください。");
+    return;
+  }
 
-        li.append(label, button);
+  items.splice(index, 1);
+  saveItems();
+};
+
+        // 在庫を1個減らすボタン
+const decreaseButton = document.createElement("button");
+decreaseButton.textContent = "－";
+decreaseButton.onclick = () => {
+  const current = pendingQuantities.has(index)
+    ? pendingQuantities.get(index)
+    : Number(item.quantity);
+
+  const next = Math.max(0, current - 1);
+  pendingQuantities.set(index, next);
+
+  label.textContent = item.name + "：" + next + "個";
+};
+
+// 在庫を1個増やすボタン
+const increaseButton = document.createElement("button");
+increaseButton.textContent = "＋";
+increaseButton.onclick = () => {
+  const current = pendingQuantities.has(index)
+    ? pendingQuantities.get(index)
+    : Number(item.quantity);
+
+  const next = current + 1;
+  pendingQuantities.set(index, next);
+
+  label.textContent = item.name + "：" + next + "個";
+};
+
+// 商品名、数量変更ボタン、削除ボタンを表示
+li.append(label, decreaseButton, increaseButton, button);
         list.appendChild(li);
       });
     }
@@ -74,10 +112,24 @@
       localStorage.setItem("items", JSON.stringify(items));
       showItems();
     }
+// 変更した数量をまとめて保存する
+document.getElementById("saveQuantityButton").onclick = () => {
+  pendingQuantities.forEach((quantity, index) => {
+    if (items[index]) {
+      items[index].quantity = quantity;
+    }
+  });
 
+  pendingQuantities.clear();
+  saveItems();
+  alert("数量の変更を保存しました");
+};
     document.getElementById("form").onsubmit = (event) => {
       event.preventDefault();
-
+if (pendingQuantities.size > 0) {
+  alert("保存していない数量の変更があります。先に「変更をまとめて保存」を押してください。");
+  return;
+}
       const name = document.getElementById("name");
       const quantity = document.getElementById("quantity");
 
