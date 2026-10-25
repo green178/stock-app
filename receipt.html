@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f1f9ee">
+  <title>レシート読み取り｜わが家の在庫管理</title>
+  <style>
+    :root{color-scheme:light;--green:#367550;--ink:#31473a;--mint:#eaf6e9;--pink:#fae9ee;--line:#dcebdc;--muted:#65786a}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;color:var(--ink);background-color:#f0faef;background-image:radial-gradient(circle at 24px 25px,#c7e7c7 0 2px,transparent 3px),radial-gradient(circle at 84px 78px,#d8ecd4 0 2px,transparent 3px);background-size:120px 120px;padding:18px 12px 50px}
+    main{max-width:690px;margin:0 auto;background:#ffffffee;border-radius:24px;box-shadow:0 12px 28px #517a5e15;padding:clamp(16px,4vw,32px)}
+    h1{font-size:clamp(1.25rem,4vw,1.8rem);color:var(--green);line-height:1.5;margin:0 0 8px}
+    h2{font-size:1.1rem;color:var(--green);margin:4px 0 12px}
+    p{line-height:1.7;margin:6px 0 14px}
+    a{color:#357958}
+    .muted,.hint{color:var(--muted);font-size:.86rem}
+    .panel{border:1px solid var(--line);background:#fafff9;border-radius:18px;padding:16px;margin:18px 0}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .field{display:flex;flex-direction:column;gap:5px;min-width:0}
+    label.field>span,.label{font-size:.82rem;color:var(--muted);font-weight:650}
+    input,select,textarea,button{font:inherit}
+    input:not([type=file]),select,textarea{width:100%;min-width:0;background:white;border:1px solid #c5d9ca;border-radius:11px;padding:11px;color:var(--ink);font-size:16px}
+    textarea{resize:vertical;line-height:1.6}
+    button,.file-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;border-radius:12px;padding:11px 14px;border:1px solid #a0c7a7;cursor:pointer;background:#e4f4e6;color:#326b45;font-weight:700;text-align:center;text-decoration:none}
+    button.primary,.file-button.primary{background:#7fc695;border-color:#7fc695;color:#123e23}
+    button.secondary{background:#fff;border-color:#d4e6d7}
+    button.danger{background:#fff0f1;border-color:#f3d5d8;color:#9a4a59}
+    button:disabled{cursor:not-allowed;opacity:.5}
+    button:focus-visible,.file-button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid #a8d9bc;outline-offset:2px}
+    .btns{display:flex;gap:9px;flex-wrap:wrap}
+    .btns>*{flex:1;min-width:140px}
+    input[type=file]{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
+    #preview{display:none;max-width:100%;max-height:350px;object-fit:contain;margin:14px auto 4px;border-radius:10px;border:1px solid var(--line);background:#fff}
+    #status{font-size:.9rem;margin-top:12px;min-height:22px}
+    progress{width:100%;height:10px;accent-color:#79b990;display:none}
+    .item{display:grid;grid-template-columns:minmax(0,1fr) 80px 110px;gap:8px;margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:14px;background:white}
+    .item .item-name{grid-column:1/-1}
+    .item .item-category{grid-column:1/3}
+    .item .item-delete{grid-column:3}
+    .item input{padding:9px}
+    .subtotal{text-align:right;font-size:1.08rem;font-weight:700;margin:14px 2px}
+    #editor,#history{display:none}
+    .notice{font-size:.86rem;background:#fff8e7;border:1px solid #f1e1b0;padding:10px;border-radius:10px;line-height:1.6}
+    .receipt{padding:12px 0;border-top:1px solid var(--line)}
+    .receipt .head{display:flex;justify-content:space-between;gap:8px;align-items:start}
+    .receipt .line{display:flex;justify-content:space-between;gap:10px;font-size:.89rem;margin:6px 0}
+    .receipt .line span:first-child{overflow-wrap:anywhere}
+    .receipt details{margin-top:7px}
+    .receipt summary{color:#477b59;cursor:pointer}
+    .summary-card{padding:13px;border-radius:13px;background:var(--mint)}
+    .summary-card strong{font-size:1.3rem;color:var(--green)}
+    .empty{color:var(--muted);font-size:.9rem}
+    @media (max-width:430px){.item{grid-template-columns:minmax(0,1fr) 70px 90px;gap:6px;padding:10px}.item input{padding:8px 6px}.panel{padding:13px}.btns>*{min-width:120px}}
+    @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+  </style>
+</head>
+<body>
+<main>
+  <h1>🍅 レシートを撮って登録 🥦</h1>
+  <p class="muted">わが家の在庫管理・撮影お試し版　🐬</p>
+  <p>レシートを撮影すると文字を読み取り、商品名や金額の候補を表示します。間違いは直してから保存できます。</p>
+  <div class="panel">
+    <h2>① レシートを撮影</h2>
+    <div class="btns">
+      <label class="file-button primary" for="cameraFile">📷 カメラで撮影</label>
+      <input id="cameraFile" type="file" accept="image/*" capture="environment">
+      <label class="file-button" for="photoFile">🖼️ 写真から選ぶ</label>
+      <input id="photoFile" type="file" accept="image/*">
+    </div>
+    <img id="preview" alt="撮影したレシートのプレビュー">
+    <p class="hint">明るい場所でレシート全体をまっすぐ撮影してください。初回は日本語の読み取りデータをダウンロードするため、通信環境が必要です。</p>
+    <button class="primary" id="readButton" type="button" disabled>文字を読み取る</button>
+    <div id="status" role="status" aria-live="polite">写真を選んでください。</div>
+    <progress id="progress" value="0" max="100"></progress>
+  </div>
+  <section id="editor" class="panel">
+    <h2>② 読み取り内容を確認・修正</h2>
+    <p class="notice">⚠️ AIやOCRの読み取り結果は間違うことがあります。日付・商品・数量・金額を必ず確認してください。価格は1個単価ではなく、その行の購入金額として入力します。</p>
+    <div class="grid" style="margin:15px 0">
+      <label class="field"><span>購入日</span><input id="purchaseDate" type="date"></label>
+      <label class="field"><span>レシートの合計（参考・任意）</span><input id="printedTotal" type="number" min="0" step="1" placeholder="例：1580"></label>
+    </div>
+    <details>
+      <summary>読み取った文字を確認・編集する</summary>
+      <p class="hint">認識した文字をそのまま表示しています。修正後に「文字から商品候補を作り直す」を押せます。</p>
+      <textarea id="rawText" rows="9" aria-label="レシート認識テキスト"></textarea>
+      <button id="parseButton" class="secondary" type="button" style="margin-top:9px">文字から商品候補を作り直す</button>
+    </details>
+    <h2 style="margin-top:20px">商品一覧</h2>
+    <p class="hint">名前・数量・金額・分類を修正できます。誤検出の行は削除してください。</p>
+    <div id="itemRows"></div>
+    <button id="addItem" class="secondary" type="button">＋ 商品を1行追加</button>
+    <div class="subtotal" id="draftTotal">商品合計：¥0</div>
+    <p class="hint" id="compareMessage"></p>
+    <button id="saveButton" class="primary" type="button" style="width:100%">内容を確認して購入履歴に保存</button>
+    <p class="hint">写真そのものは保存しません。購入情報だけをこのブラウザに保存します。現在の在庫数量は変更しません。</p>
+  </section>
+  <section id="history" class="panel">
+    <h2>③ 保存した購入履歴</h2>
+    <div class="grid" style="margin-bottom:14px">
+      <div class="summary-card"><span class="muted">今週の購入金額</span><br><strong id="weekSum">¥0</strong></div>
+      <div class="summary-card"><span class="muted">今月の購入金額</span><br><strong id="monthSum">¥0</strong></div>
+    </div>
+    <p class="hint">週は月曜日から日曜日です。保存した購入履歴だけを集計します。</p>
+    <div id="historyRows"></div>
+  </section>
+  <p style="text-align:center"><a href="./index.html">← 在庫管理の画面へ戻る</a></p>
+</main>
+<script>
+(() => {
+  'use strict';
+  const KEY = 'stockAppPurchaseHistoryV1';
+  const $ = id => document.getElementById(id);
+  const yen = n => '¥' + Number(n || 0).toLocaleString('ja-JP');
+  const localDay = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const today = () => localDay(new Date());
+  let imageUrl = null;
+  let chosenFile = null;
+  let rowSerial = 0;
+  let draft = [];
+  let workerPromise = null;
+  let isReading = false;
+  const sanitizeNums = s => s.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-65248))
+    .replace(/[，、]/g,',').replace(/[￥]/g,'¥').replace(/[．]/g,'.');
+  function readHistory() {
+    try { const v=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(v)?v:[]; }
+    catch(e) { return []; }
+  }
+  function setStatus(message){$('status').textContent=message;}
+  function inputChanged(ev){
+    const id=Number(ev.target.closest('.item')?.dataset.id);
+    const row=draft.find(x=>x.id===id);
+    if(!row)return;
+    row[ev.target.dataset.field]=ev.target.value;
+    updateTotal();
+  }
+  function updateTotal(){
+    const sum=draft.reduce((n,row)=>n+Math.max(0,Number(row.amount)||0),0);
+    $('draftTotal').textContent='商品合計：'+yen(sum);
+    const printed=Number($('printedTotal').value);
+    $('compareMessage').textContent=$('printedTotal').value!=='' && Math.round(printed)!==Math.round(sum)
+      ? `レシート合計（${yen(printed)}）と商品合計（${yen(sum)}）が一致しません。値引き・税金・読み取り漏れなどを確認してください。`
+      : '';
+  }
+  function drawRows(){
+    const box=$('itemRows'); box.replaceChildren();
+    if(!draft.length){
+      const empty=document.createElement('p');empty.className='empty';empty.textContent='商品候補が見つかりませんでした。「＋ 商品を1行追加」から入力できます。';box.append(empty);
+    }
+    for(const r of draft){
+      const holder=document.createElement('div');holder.className='item';holder.dataset.id=String(r.id);
+      const field=(title,key,type,extra='')=>{
+        const l=document.createElement('label');l.className='field';l.innerHTML=`<span>${title}</span>`;
+        const i=document.createElement('input');i.type=type;i.dataset.field=key;i.value=String(r[key]);i.setAttribute('aria-label',title);if(extra)i.min=extra;i.addEventListener('input',inputChanged);l.append(i);return l;
+      };
+      const name=field('商品名','name','text');name.classList.add('item-name');
+      const qty=field('数量','quantity','number','1');
+      const amount=field('購入金額（円）','amount','number','0');
+      const category=document.createElement('label');category.className='field item-category';category.innerHTML='<span>分類</span>';
+      const select=document.createElement('select');select.dataset.field='category';
+      for(const s of ['食品','日用品','その他']){const o=document.createElement('option');o.value=s;o.textContent=s;select.append(o);}
+      select.value=r.category;select.addEventListener('change',inputChanged);category.append(select);
+      const del=document.createElement('button');del.type='button';del.className='danger item-delete';del.textContent='削除';
+      del.setAttribute('aria-label',`${r.name||'項目'}を一覧から削除`);
+      del.addEventListener('click',()=>{draft=draft.filter(x=>x.id!==r.id);drawRows();});
+      holder.append(name,qty,amount,category,del);box.append(holder);
+    }
+    updateTotal();
+  }
+  function newRow(name='',amount='',quantity='1'){
+    return {id:++rowSerial,name,quantity:String(quantity),amount:String(amount),category:'食品'};
+  }
+  function detectDate(raw){
+    const t=sanitizeNums(raw);
+    let m=t.match(/(20\d{2})\s*[年\/\-.]\s*(\d{1,2})\s*[月\/\-.]\s*(\d{1,2})\s*日?/);
+    if(!m) {
+      const short=t.match(/(?:^|\s)(\d{2})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?:\s|$)/);
+      if(short)m=[short[0],String(2000+Number(short[1])),short[2],short[3]];
+    }
+    if(!m)return '';
+    const yyyy=Number(m[1]),mm=Number(m[2]),dd=Number(m[3]);
+    const test=new Date(yyyy,mm-1,dd);
+    if(test.getFullYear()!==yyyy || test.getMonth()+1!==mm || test.getDate()!==dd)return '';
+    return localDay(test);
+  }
+  function detectTotal(raw){
+    const lines=sanitizeNums(raw).split(/\r?\n/);
+    for(const text of lines){
+      const m=text.match(/(?:お買上[げ]?合計|お買い上げ合計|総合計|税込合計|支払合計|合\s*計|現\s*計)\D{0,10}(\d{2,7}(?:,\d{3})*)/);
+      if(m)return Number(m[1].replace(/,/g,''));
+    }
+    return '';
+  }
+  function parseReceipt(raw){
+    const ignore=/(?:合\s*計|小\s*計|お預|お釣|預り|釣銭|消費税|内税|外税|税抜|税込|軽減|割引|値引|クレジット|電子マネー|支払|会計|領収|レシート|ポイント|残高|クーポン|お買上|お買い上げ|店番|電話|TEL|登録番号|インボイス|対象|カード|釣り|交通系|現金|決済|現計|課税|消費|合計金額|おつり)/i;
+    const result=[];
+    for(let line of sanitizeNums(raw).split(/\r?\n/)){
+      line=line.replace(/[\t　]+/g,' ').trim();
+      if(line.length<3||ignore.test(line)||/^(\d{4}[\/\-.年]\d|\d{2}:\d{2}|\d{8,})/.test(line))continue;
+      // 商品名と価格が同じ行にある一般的なレシートを候補として抽出。
+      const m=line.match(/^(.{2,55}?)\s+(?:(?:[xX×＊*]\s*(\d{1,2})\s+))?[¥￥]?\s*(\d{2,3}(?:,\d{3})+|\d{2,6})\s*(?:円|[※*＊])?\s*$/);
+      if(!m)continue;
+      let name=m[1].replace(/^[*＊※\-・\s]+/,'').trim();
+      if(name.length<2||/^\d+([\/\-.]\d+)*$/.test(name)||name.includes('〒'))continue;
+      const amount=Number(m[3].replace(/,/g,''));
+      if(!Number.isFinite(amount)||amount>999999)continue;
+      result.push(newRow(name,amount,m[2]||'1'));
+      if(result.length>=80)break;
+    }
+    return result;
+  }
+  function createCanvas(file){
+    return new Promise((resolve,reject)=>{
+      const url=URL.createObjectURL(file),img=new Image();
+      img.onload=()=>{
+        try {
+          const scale=Math.min(1,1900/img.naturalWidth,3200/img.naturalHeight);
+          const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+          const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0,canvas.width,canvas.height);
+          URL.revokeObjectURL(url);resolve(canvas);
+        } catch(e){URL.revokeObjectURL(url);reject(e);}
+      };
+      img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('画像が開けませんでした。JPEGまたはPNGでお試しください。'));};
+      img.src=url;
+    });
+  }
+  async function getWorker(){
+    if(!workerPromise){
+      workerPromise=(async()=>{
+        if(!window.Tesseract){
+          await new Promise((resolve,reject)=>{
+            const script=document.createElement('script');script.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+            script.onload=resolve;script.onerror=()=>reject(new Error('読み取り用ライブラリを取得できませんでした。インターネット接続を確認してください。'));
+            document.head.append(script);
+          });
+        }
+        return window.Tesseract.createWorker(['jpn','eng'],1,{logger:m=>{
+          if(typeof m.progress==='number'){
+            $('progress').value=Math.round(m.progress*100);
+            if(m.status==='recognizing text')setStatus('文字を認識しています… '+Math.round(m.progress*100)+'%');
+          }
+        }});
+      })().catch(e=>{workerPromise=null;throw e;});
+    }
+    return workerPromise;
+  }
+  async function scan(){
+    if(isReading||!chosenFile)return;
+    isReading=true;$('readButton').disabled=true;$('progress').style.display='block';$('progress').value=0;
+    $('editor').style.display='none';setStatus('日本語の読み取り準備中です… 初回は少し時間がかかります。');
+    try {
+      const canvas=await createCanvas(chosenFile);
+      const worker=await getWorker();
+      setStatus('レシートの文字を読み取っています…');
+      const {data}=await worker.recognize(canvas);
+      const text=(data&&data.text)||'';
+      $('rawText').value=text;
+      $('purchaseDate').value=detectDate(text)||today();
+      $('printedTotal').value=detectTotal(text);
+      draft=parseReceipt(text);
+      drawRows();
+      $('editor').style.display='block';
+      setStatus(text.trim()?`読み取りが完了しました。商品候補：${draft.length}件。下で内容を確認してください。`:'文字が見つかりませんでした。写真を撮り直すか、商品を手入力してください。');
+      $('editor').scrollIntoView({behavior:'smooth',block:'start'});
+    } catch(e){
+      setStatus('読み取りに失敗しました：'+(e&&e.message?e.message:String(e)));
+      $('editor').style.display='block';$('purchaseDate').value=today();$('printedTotal').value='';draft=[];drawRows();
+    } finally {isReading=false;$('readButton').disabled=!chosenFile;$('progress').style.display='none';}
+  }
+  function selectFile(file){
+    if(!file)return;
+    if(!file.type.startsWith('image/')){setStatus('画像ファイルを選んでください。');return;}
+    chosenFile=file;
+    if(imageUrl)URL.revokeObjectURL(imageUrl);
+    imageUrl=URL.createObjectURL(file);$('preview').src=imageUrl;$('preview').style.display='block';
+    $('readButton').disabled=false;$('editor').style.display='none';setStatus('写真を選択しました。「文字を読み取る」を押してください。');
+  }
+  function renderHistory(){
+    const history=readHistory();$('history').style.display='block';
+    const todayDate=new Date(),dayIndex=(todayDate.getDay()+6)%7;
+    const weekStart=new Date(todayDate.getFullYear(),todayDate.getMonth(),todayDate.getDate()-dayIndex);
+    const monthStart=localDay(new Date(todayDate.getFullYear(),todayDate.getMonth(),1));
+    const startWeek=localDay(weekStart);
+    const total=h=>h.items.reduce((n,i)=>n+Number(i.amount||0),0);
+    $('weekSum').textContent=yen(history.filter(x=>x.date>=startWeek&&x.date<=today()).reduce((s,x)=>s+total(x),0));
+    $('monthSum').textContent=yen(history.filter(x=>x.date>=monthStart&&x.date<=today()).reduce((s,x)=>s+total(x),0));
+    const box=$('historyRows');box.replaceChildren();
+    if(!history.length){const t=document.createElement('p');t.className='empty';t.textContent='まだ購入履歴がありません。最初のレシートを保存してみましょう。';box.append(t);return;}
+    history.sort((a,b)=>b.date.localeCompare(a.date)||b.savedAt.localeCompare(a.savedAt));
+    for(const receipt of history.slice(0,30)){
+      const card=document.createElement('div');card.className='receipt';
+      const top=document.createElement('div');top.className='head';
+      const title=document.createElement('strong');title.textContent=receipt.date+' のお買い物';
+      const amount=document.createElement('strong');amount.textContent=yen(total(receipt));
+      top.append(title,amount);card.append(top);
+      const det=document.createElement('details');const sum=document.createElement('summary');sum.textContent=`${receipt.items.length}商品を見る`;det.append(sum);
+      for(const i of receipt.items){
+        const line=document.createElement('div');line.className='line';
+        const n=document.createElement('span');n.textContent=`${i.name} × ${i.quantity}（${i.category}）`;
+        const a=document.createElement('span');a.textContent=yen(i.amount);line.append(n,a);det.append(line);
+      }
+      card.append(det);box.append(card);
+    }
+  }
+  function save(){
+    const date=$('purchaseDate').value;
+    if(!date){alert('購入日を入力してください。');return;}
+    if(!draft.length){alert('商品を1件以上登録してください。');return;}
+    const entries=[];
+    for(let i=0;i<draft.length;i++){
+      const row=draft[i],name=String(row.name).trim(),quantity=Number(row.quantity),amount=Number(row.amount);
+      if(!name||!Number.isInteger(quantity)||quantity<1||!Number.isInteger(amount)||amount<0||String(row.amount).trim()===''){
+        alert(`${i+1}行目の商品名・数量・金額を確認してください。`);return;
+      }
+      entries.push({name,quantity,amount,category:row.category});
+    }
+    const printed=$('printedTotal').value;
+    if(printed!==''&&Number(printed)!==entries.reduce((n,i)=>n+i.amount,0)){
+      if(!confirm('レシート合計と商品合計が違います。値引きや税の扱いも確認しましたか？ この内容で保存しますか？'))return;
+    }
+    const record={id:(window.crypto&&crypto.randomUUID)?crypto.randomUUID():String(Date.now())+'-'+Math.random().toString(36).slice(2),date,savedAt:new Date().toISOString(),items:entries};
+    try{
+      const h=readHistory();h.push(record);localStorage.setItem(KEY,JSON.stringify(h));
+    }catch(e){alert('保存に失敗しました。端末の空き容量やブラウザの保存設定を確認してください。');return;}
+    renderHistory();$('history').scrollIntoView({behavior:'smooth',block:'start'});alert('購入履歴を保存しました！ 🐬');
+    // 複数回押した際の二重記録を防ぐ。新しい画像を選ぶと再度保存できる。
+    $('saveButton').disabled=true;
+    $('saveButton').textContent='保存済みです（次のレシートを選んでください）';
+  }
+  for(const id of ['cameraFile','photoFile'])$(id).addEventListener('change',e=>{
+    const f=e.target.files&&e.target.files[0];selectFile(f);e.target.value='';
+    $('saveButton').disabled=false;$('saveButton').textContent='内容を確認して購入履歴に保存';
+  });
+  $('readButton').addEventListener('click',scan);
+  $('parseButton').addEventListener('click',()=>{
+    draft=parseReceipt($('rawText').value);const d=detectDate($('rawText').value);if(d)$('purchaseDate').value=d;
+    const total=detectTotal($('rawText').value);if(total!=='')$('printedTotal').value=total;
+    drawRows();
+  });
+  $('addItem').addEventListener('click',()=>{draft.push(newRow());drawRows();});
+  $('printedTotal').addEventListener('input',updateTotal);
+  $('saveButton').addEventListener('click',save);
+  $('purchaseDate').value=today();renderHistory();
+})();
+</script>
+</body>
+</html>
