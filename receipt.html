@@ -198,11 +198,12 @@
     for(let line of sanitizeNums(raw).split(/\r?\n/)){
       line=line.replace(/[\t　]+/g,' ').trim();
       if(line.length<3||ignore.test(line)||/^(\d{4}[\/\-.年]\d|\d{2}:\d{2}|\d{8,})/.test(line))continue;
-      // 商品名と価格が同じ行にある一般的なレシートを候補として抽出。
-      const m=line.match(/^(.{2,55}?)\s+(?:(?:[xX×＊*]\s*(\d{1,2})\s+))?[¥￥]?\s*(\d{2,3}(?:,\d{3})+|\d{2,6})\s*(?:円|[※*＊])?\s*$/);
+      // 商品名と価格が同じ行にある一般的なレシートを候補として抽出。  
+    line=line.replace(/\s+[A-Za-z]{2,}$/, '');
+    const m=line.match(/^(.{2,55}?)\s+(?:(?:[xX×＊*]\s*(\d{1,2})\s+))?[¥￥]?\s*(\d{2,3}(?:,\d{3})+|\d{2,6})\s*(?:円|[※*＊])?\s*$/);
       if(!m)continue;
       let name=m[1].replace(/^[*＊※\-・\s]+/,'').trim();
-　　　　if (/[%$=]/.test(name) || /^[A-Za-z]:\d/.test(name)) continue;
+　　　　
       const amount=Number(m[3].replace(/,/g,''));
       if(!Number.isFinite(amount)||amount>999999)continue;
       result.push(newRow(name,amount,m[2]||'1'));
@@ -215,7 +216,7 @@
       const url=URL.createObjectURL(file),img=new Image();
       img.onload=()=>{
         try {
-         const scale=Math.min(1,2400/img.naturalWidth,3600/img.naturalHeight); 
+     const scale=Math.min(1,1900/img.naturalWidth,3200/img.naturalHeight);     
           const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
           const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0,canvas.width,canvas.height);
           URL.revokeObjectURL(url);resolve(canvas);
