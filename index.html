@@ -201,6 +201,64 @@ li button:last-child:hover {
     transform: translateY(-7px);
   }
 }
+
+/* ホーム画面：スマホでも2列で並ぶメニュー */
+.home-intro { margin: 12px 0 18px; }
+.home-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.home-tile {
+  box-sizing: border-box; display: flex; flex-direction: column;
+  justify-content: center; align-items: center; min-height: 138px;
+  gap: 7px; padding: 15px 9px; border: 1px solid transparent;
+  border-radius: 18px; text-decoration: none; text-align: center;
+  color: #315c43; font: inherit; cursor: pointer;
+}
+.home-tile:hover { filter: brightness(0.98); }
+.home-tile .tile-icon { font-size: 31px; line-height: 1.2; }
+.home-tile .tile-name { font-size: 16px; font-weight: bold; line-height: 1.4; }
+.home-tile .tile-desc { font-size: 12px; line-height: 1.5; font-weight: normal; }
+.home-tile .tile-status { font-size: 11px; font-weight: bold; }
+.tile-receipt { background: #e3f4e7; }
+.tile-stock { background: #fff0dd; color: #7a5632; }
+.tile-shopping { background: #e8f2fc; color: #496b8e; }
+.tile-history { background: #f3e9f9; color: #775b88; }
+.home-tile[disabled] { opacity: 0.64; cursor: default; }
+.home-note { margin-top: 18px; margin-bottom: 0; font-size: 13px; line-height: 1.7; }
+#inventoryPanel { display: none; }
+#backHomeButton { background: #e6f1e5; color: #416f4e; margin: 8px 0 12px; }
+#backHomeButton:hover { background: #d5ead5; }
+@media (max-width: 480px) {
+  .home-grid { gap: 10px; }
+  .home-tile { min-height: 132px; padding: 12px 6px; }
+  .home-tile .tile-name { font-size: 14px; }
+  .home-tile .tile-desc { font-size: 11px; }
+}
+
+/* 食品の分類・期限確認 */
+.stock-form-extra { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:-10px; margin-bottom:18px; }
+.stock-form-extra label, .stock-editor label { display:flex; flex-direction:column; gap:5px; font-size:13px; color:#52725b; font-weight:bold; }
+.stock-form-extra select, .stock-form-extra input, .stock-editor select, .stock-editor input { box-sizing:border-box; width:100%; min-width:0; padding:11px; font-size:16px; border:1px solid #d9e8d6; border-radius:11px; background:#fff; color:#384e3d; }
+.field-note { grid-column:1/-1; font-size:12px; color:#647867; margin:-3px 0 0; }
+.expiry-panel { background:#fffaf1; border:1px solid #efdfbf; border-radius:16px; padding:14px 16px; margin:16px 0; }
+.expiry-panel h3 { font-size:16px; margin:0 0 7px; color:#80633c; }
+.expiry-panel p { margin:6px 0; font-size:13px; line-height:1.65; }
+#expiryAlerts { list-style:none; padding:0; margin:9px 0; }
+#expiryAlerts li { display:block; margin-bottom:7px; padding:10px 12px; font-size:14px; line-height:1.5; background:white; border:1px solid #eedfc6; }
+#expiryAlerts .alert-label { color:#9b503c; font-size:12px; font-weight:bold; }
+.stock-item { display:block; }
+.stock-head { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:9px; }
+.stock-summary { flex:1; min-width:120px; }
+.stock-summary strong { display:block; font-size:16px; color:#36533c; }
+.stock-summary small { display:block; margin-top:5px; font-size:12px; line-height:1.55; color:#6c7b6d; }
+.stock-controls { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
+.stock-controls button { min-width:44px; min-height:44px; padding:9px 13px; }
+.stock-controls button.delete-stock { background:#f9e4e8; color:#ac6677; }
+.stock-edit-toggle { margin-top:10px; background:#e5f0e7; color:#386d4b; font-size:13px; padding:8px 12px; }
+.stock-editor { display:none; margin-top:12px; padding:12px; background:#f6fbf5; border:1px solid #e1eddd; border-radius:12px; }
+.stock-editor.open { display:block; }
+.stock-editor-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.stock-editor button { margin-top:10px; background:#83c694; }
+.stock-blank { font-size:13px; color:#6c7b6d; }
+@media(max-width:480px) { .stock-form-extra, .stock-editor-grid { grid-template-columns:1fr; } .stock-summary { flex:1 0 100%; } }
 </style> 
 </head>
 <body>
@@ -210,21 +268,80 @@ li button:last-child:hover {
   <div class="dolphin-icon">🐬</div>
   <p id="dolphinText"></p>
 </div>
-    <p>家にある商品を記録しましょう。</p>
+    <section id="homePanel" aria-label="ホーム画面">
+      <p class="home-intro">今日は何をしますか？</p>
+      <div class="home-grid">
+        <a class="home-tile tile-receipt" href="receipt.html">
+          <span class="tile-icon" aria-hidden="true">📷</span>
+          <span class="tile-name">レシート登録</span>
+          <span class="tile-desc">撮影して購入記録</span>
+          <span class="tile-status">試作中</span>
+        </a>
+        <button class="home-tile tile-stock" id="openInventoryButton" type="button">
+          <span class="tile-icon" aria-hidden="true">📦</span>
+          <span class="tile-name">在庫を見る</span>
+          <span class="tile-desc">数量を確認・変更</span>
+        </button>
+        <button class="home-tile tile-shopping" type="button" disabled>
+          <span class="tile-icon" aria-hidden="true">🛒</span>
+          <span class="tile-name">買い物リスト</span>
+          <span class="tile-desc">買い忘れを防ぐ</span>
+          <span class="tile-status">準備中</span>
+        </button>
+        <button class="home-tile tile-history" type="button" disabled>
+          <span class="tile-icon" aria-hidden="true">📊</span>
+          <span class="tile-name">購入履歴・グラフ</span>
+          <span class="tile-desc">支出を振り返る</span>
+          <span class="tile-status">準備中</span>
+        </button>
+      </div>
+      <p class="home-note">まずは使える機能から。準備中の機能は、今後少しずつ追加します。</p>
+    </section>
 
-    <form id="form">
-      <input id="name" placeholder="商品名" required>
-      <input id="quantity" type="number" min="1"
-             value="1" required>
-      <button type="submit">登録する</button>
-    </form>
+    <section id="inventoryPanel" aria-label="在庫管理">
+      <button id="backHomeButton" type="button">← ホームに戻る</button>
+      <h2 style="color:#4c8b5a; font-size:1.25rem;">📦 在庫を見る</h2>
+      <p>商品の数量・分類・期限を確認しましょう。</p>
+      <form id="form">
+        <input id="name" placeholder="商品名" required>
+        <input id="quantity" type="number" min="1" value="1" required>
+      </form>
+      <div class="stock-form-extra">
+        <label>商品の分類
+          <select id="newCategory">
+            <option value="auto">自動で判定（あとから変更できます）</option>
+            <option value="fresh">生鮮食品（野菜・果物・肉・魚）</option>
+            <option value="chilled">傷みやすい食品（牛乳・豆腐・惣菜など）</option>
+            <option value="pantry">その他の食品</option>
+            <option value="daily">日用品</option>
+          </select>
+        </label>
+        <label>期限（わかる場合のみ）
+          <input id="newExpiry" type="date">
+        </label>
+        <label>期限の種類
+          <select id="newExpiryType">
+            <option value="">未設定</option>
+            <option value="use">消費期限</option>
+            <option value="best">賞味期限</option>
+          </select>
+        </label>
+        <p class="field-note">※ 分類は商品名から簡易判定します。期限は自動推測せず、パッケージに書かれた日付を登録してください。</p>
+      </div>
+              <button type="submit" form="form">登録する</button>
+<section class="expiry-panel" aria-label="食品の期限確認">
+        <h3>🔔 確認したい食品</h3>
+        <p>登録された期限や、購入からの日数を参考にお知らせします。食品が安全かどうかは判定しません。</p>
+        <ul id="expiryAlerts"></ul>
+        <p id="expiryEmpty">現在、確認が必要な食品はありません。</p>
+      </section>
+      <details id="inventoryDetails" open>
+        <summary>在庫一覧を表示する</summary>
+        <ul id="list"></ul>
+        <button id="saveQuantityButton" type="button">変更をまとめて保存</button>
+      </details>
+    </section>
 
-    <details>
-  <summary>在庫一覧を表示する</summary>
-<ul id="list"></ul>
-<button id="saveQuantityButton" type="button">変更をまとめて保存</button>
-</details>
-    
   </main>
 
   <script>
@@ -232,6 +349,24 @@ li button:last-child:hover {
       localStorage.getItem("items") || "[]"
     );
 const pendingQuantities = new Map();
+// ホームと在庫画面の切り替え（保存済みの在庫データは変更しない）
+const homePanel = document.getElementById("homePanel");
+const inventoryPanel = document.getElementById("inventoryPanel");
+document.getElementById("openInventoryButton").onclick = () => {
+  homePanel.style.display = "none";
+  inventoryPanel.style.display = "block";
+  document.getElementById("inventoryDetails").open = true;
+  window.scrollTo(0, 0);
+};
+document.getElementById("backHomeButton").onclick = () => {
+  if (pendingQuantities.size > 0) {
+    alert("保存していない数量の変更があります。先に『変更をまとめて保存』を押してください。");
+    return;
+  }
+  inventoryPanel.style.display = "none";
+  homePanel.style.display = "block";
+  window.scrollTo(0, 0);
+};
 // 久しぶりにアプリを開いたときのイルカのコメント
 function checkDolphinMessage() {
   const lastVisit = localStorage.getItem("lastVisitDate");
@@ -258,59 +393,95 @@ function checkDolphinMessage() {
   localStorage.setItem("lastVisitDate", String(now));
 }
 checkDolphinMessage();
-    function showItems() {
-      const list = document.getElementById("list");
-      list.innerHTML = "";
-
-      items.forEach((item, index) => {
-        const li = document.createElement("li");
-        const label = document.createElement("span");
-        label.textContent = item.name + "：" + item.quantity + "個 ";
-
-        const button = document.createElement("button");
-        button.textContent = "削除";
-        button.onclick = () => {
-  if (pendingQuantities.size > 0) {
-    alert("保存していない数量の変更があります。先に「変更をまとめて保存」を押してください。");
-    return;
-  }
-
-  items.splice(index, 1);
-  saveItems();
-};
-
-        // 在庫を1個減らすボタン
-const decreaseButton = document.createElement("button");
-decreaseButton.textContent = "－";
-decreaseButton.onclick = () => {
-  const current = pendingQuantities.has(index)
-    ? pendingQuantities.get(index)
-    : Number(item.quantity);
-
-  const next = Math.max(0, current - 1);
-  pendingQuantities.set(index, next);
-
-  label.textContent = item.name + "：" + next + "個";
-};
-
-// 在庫を1個増やすボタン
-const increaseButton = document.createElement("button");
-increaseButton.textContent = "＋";
-increaseButton.onclick = () => {
-  const current = pendingQuantities.has(index)
-    ? pendingQuantities.get(index)
-    : Number(item.quantity);
-
-  const next = current + 1;
-  pendingQuantities.set(index, next);
-
-  label.textContent = item.name + "：" + next + "個";
-};
-
-// 商品名、数量変更ボタン、削除ボタンを表示
-li.append(label, decreaseButton, increaseButton, button);
-        list.appendChild(li);
+    // 商品名の簡易分類。曖昧な場合は「その他の食品」にし、利用者が修正できる。
+    function guessCategory(name) {
+      const t=String(name||'').replace(/\s/g,'').toLowerCase();
+      if (/(シャンプー|洗剤|柔軟剤|石鹸|せっけん|歯磨き|ティッシュ|トイレット|スポンジ|ラップ|洗濯|掃除|メガネ)/.test(t)) return 'daily';
+      if (/(牛乳|ヨーグルト|豆腐|納豆|惣菜|弁当|生クリーム|チーズ|卵|たまご)/.test(t)) return 'chilled';
+      if (/(小松菜|ほうれん草|キャベツ|レタス|トマト|きゅうり|玉ねぎ|にんじん|じゃがいも|いちご|りんご|バナナ|みかん|鶏肉|豚肉|牛肉|ひき肉|刺身|鮮魚|さけ|鮭|サバ|鯖|白菜|きのこ|もやし)/.test(t)) return 'fresh';
+      return 'pantry';
+    }
+    const categoryLabels={fresh:'生鮮食品',chilled:'傷みやすい食品',pantry:'その他の食品',daily:'日用品'};
+    const expiryLabels={use:'消費期限',best:'賞味期限'};
+    function categoryOf(item) { return categoryLabels[item.category] ? item.category : guessCategory(item.name); }
+    function todayStr(){ const d=new Date(); return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-'); }
+    function daysFromToday(ymd){
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(ymd||'')) return null;
+      const parts=ymd.split('-').map(Number), today=todayStr().split('-').map(Number);
+      return Math.round((Date.UTC(parts[0],parts[1]-1,parts[2])-Date.UTC(today[0],today[1]-1,today[2]))/86400000);
+    }
+    function expiryStatus(item) {
+      if(Number(item.quantity)<=0 || categoryOf(item)==='daily') return null;
+      if(item.expiryDate){
+        const days=daysFromToday(item.expiryDate);
+        const kind=expiryLabels[item.expiryType]||'登録した期限';
+        if(days!==null && days<0) return `${kind}が${Math.abs(days)}日前に過ぎています。表示・保存状況を確認してください。`;
+        if(days===0) return `${kind}が今日です。確認してください。`;
+        if(days!==null && days<=2) return `${kind}まであと${days}日です。`;
+        return null;
+      }
+      if(['fresh','chilled'].includes(categoryOf(item)) && item.purchasedAt){
+        const age=daysFromToday(item.purchasedAt);
+        if(age!==null && age<=-3) return `購入から${Math.abs(age)}日です。期限未登録のため、状態を確認してみませんか？`;
+      }
+      return null;
+    }
+    function renderExpiryAlerts(){
+      const ul=document.getElementById('expiryAlerts'); ul.replaceChildren();
+      const notices=items.map(item=>({item,message:expiryStatus(item)})).filter(x=>x.message);
+      notices.forEach(({item,message})=>{
+        const li=document.createElement('li');
+        const label=document.createElement('div');label.className='alert-label';label.textContent=item.name;
+        const body=document.createElement('div');body.textContent=message;
+        li.append(label,body);ul.append(li);
       });
+      document.getElementById('expiryEmpty').hidden=notices.length>0;
+    }
+    function showItems() {
+      const list = document.getElementById('list');
+      list.replaceChildren();
+      items.forEach((item,index)=>{
+        const li=document.createElement('li');li.className='stock-item';
+        const head=document.createElement('div');head.className='stock-head';
+        const summary=document.createElement('div');summary.className='stock-summary';
+        const title=document.createElement('strong');
+        const updateTitle=()=>{ const value=pendingQuantities.has(index)?pendingQuantities.get(index):Number(item.quantity);title.textContent=`${item.name}：${value}個`; };
+        updateTitle();
+        const description=document.createElement('small');
+        const category=categoryOf(item);
+        const expiryLabel=item.expiryDate ? `${expiryLabels[item.expiryType]||'期限'}：${item.expiryDate}`:'';
+description.replaceChildren(document.createTextNode(categoryLabels[category]), ...(expiryLabel ? [document.createElement('br'), document.createTextNode(expiryLabel)] : []));
+        summary.append(title,description);
+        const controls=document.createElement('div');controls.className='stock-controls';
+        const minus=document.createElement('button');minus.type='button';minus.textContent='－';minus.setAttribute('aria-label',item.name+'を1個減らす');
+        minus.onclick=()=>{ const current=pendingQuantities.has(index)?pendingQuantities.get(index):Number(item.quantity);pendingQuantities.set(index,Math.max(0,current-1));updateTitle(); };
+        const plus=document.createElement('button');plus.type='button';plus.textContent='＋';plus.setAttribute('aria-label',item.name+'を1個増やす');
+        plus.onclick=()=>{ const current=pendingQuantities.has(index)?pendingQuantities.get(index):Number(item.quantity);pendingQuantities.set(index,current+1);updateTitle(); };
+        const del=document.createElement('button');del.type='button';del.textContent='削除';del.className='delete-stock';
+        del.onclick=()=>{if(pendingQuantities.size>0){alert('保存していない数量の変更があります。先に「変更をまとめて保存」を押してください。');return;}items.splice(index,1);saveItems();};
+        controls.append(minus,plus,del);head.append(summary,controls);
+        const editButton=document.createElement('button');editButton.type='button';editButton.className='stock-edit-toggle';editButton.textContent='分類・期限を設定';
+        const editor=document.createElement('div');editor.className='stock-editor';
+        editButton.onclick=()=>{editor.classList.toggle('open');editButton.textContent=editor.classList.contains('open')?'設定を閉じる':'分類・期限を設定';};
+        const fields=document.createElement('div');fields.className='stock-editor-grid';
+        function makeField(caption, input){const label=document.createElement('label');label.textContent=caption;label.appendChild(input);fields.appendChild(label);return input;}
+        const catSelect=document.createElement('select');Object.entries(categoryLabels).forEach(([value,label])=>{const option=document.createElement('option');option.value=value;option.textContent=label;catSelect.appendChild(option);});catSelect.value=category;
+        makeField('分類',catSelect);
+        const dateInput=document.createElement('input');dateInput.type='date';dateInput.value=item.expiryDate||'';makeField('期限（日付）',dateInput);
+        const typeSelect=document.createElement('select');[['','未設定'],['use','消費期限'],['best','賞味期限']].forEach(([value,label])=>{const option=document.createElement('option');option.value=value;option.textContent=label;typeSelect.appendChild(option);});typeSelect.value=item.expiryType||'';makeField('期限の種類',typeSelect);
+        const purchaseInput=document.createElement('input');purchaseInput.type='date';purchaseInput.value=item.purchasedAt||'';makeField('購入日（任意）',purchaseInput);
+        const saveButton=document.createElement('button');saveButton.type='button';saveButton.textContent='分類・期限を保存';
+        saveButton.onclick=()=>{
+          if(pendingQuantities.size>0){alert('数量の変更を先に保存してください。');return;}
+          if(dateInput.value && !typeSelect.value){alert('期限の日付を入力した場合は、消費期限か賞味期限を選んでください。');return;}
+          item.category=catSelect.value;item.expiryDate=dateInput.value;item.expiryType=typeSelect.value;item.purchasedAt=purchaseInput.value;
+          saveItems();alert('分類と期限を保存しました');
+        };
+        const note=document.createElement('p');note.className='field-note';note.textContent='※ 期限のない場合は空欄で大丈夫です。生鮮食品などは購入から3日で状態の確認を促します。';
+        editor.append(fields,note,saveButton);
+        li.append(head,editButton,editor);list.appendChild(li);
+      });
+      renderExpiryAlerts();
     }
 
     function saveItems() {
@@ -344,10 +515,21 @@ if (items.some(item => item.name === name.value.trim())) {
   return;
 }
 
+      const newExpiry=document.getElementById('newExpiry').value;
+      const newExpiryType=document.getElementById('newExpiryType').value;
+      if(newExpiry && !newExpiryType){alert('期限の日付を入力した場合は、消費期限か賞味期限を選んでください。');return;}
+      const categoryChoice=document.getElementById('newCategory').value;
       items.push({
         name: name.value.trim(),
-        quantity: Number(quantity.value)
+        quantity: Number(quantity.value),
+        category: categoryChoice==='auto'?guessCategory(name.value):categoryChoice,
+        purchasedAt: todayStr(),
+        expiryDate: newExpiry,
+        expiryType: newExpiryType
       });
+      document.getElementById('newExpiry').value='';
+      document.getElementById('newExpiryType').value='';
+      document.getElementById('newCategory').value='auto';
 
       saveItems();
       event.target.reset();
