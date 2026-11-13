@@ -8,8 +8,8 @@
   <style>
     :root{color-scheme:light;--green:#367550;--ink:#31473a;--mint:#eaf6e9;--pink:#fae9ee;--line:#dcebdc;--muted:#65786a}
     *{box-sizing:border-box}
-    body{margin:0;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;color:var(--ink);background-color:#f0faef;background-image:radial-gradient(circle at 24px 25px,#c7e7c7 0 2px,transparent 3px),radial-gradient(circle at 84px 78px,#d8ecd4 0 2px,transparent 3px);background-size:120px 120px;padding:18px 12px 50px}
-    main{max-width:690px;margin:0 auto;background:#ffffffee;border-radius:24px;box-shadow:0 12px 28px #517a5e15;padding:clamp(16px,4vw,32px)}
+    body{margin:0;min-height:100vh;min-width:0;overflow-x:hidden;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;color:var(--ink);background-color:#f0faef;background-image:radial-gradient(circle at 24px 25px,#c7e7c7 0 2px,transparent 3px),radial-gradient(circle at 84px 78px,#d8ecd4 0 2px,transparent 3px);background-size:120px 120px;padding:18px 12px 50px}
+    main{width:100%;min-width:0;max-width:690px;margin:0 auto;background:#ffffffee;border-radius:24px;box-shadow:0 12px 28px #517a5e15;padding:clamp(16px,4vw,32px)}
     h1{font-size:clamp(1.25rem,4vw,1.8rem);color:var(--green);line-height:1.5;margin:0 0 8px}
     h2{font-size:1.1rem;color:var(--green);margin:4px 0 12px}
     p{line-height:1.7;margin:6px 0 14px}
@@ -32,7 +32,7 @@
     .btns>*{flex:1;min-width:140px}
     input[type=file]{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
     #preview{display:none;max-width:100%;max-height:350px;object-fit:contain;margin:14px auto 4px;border-radius:10px;border:1px solid var(--line);background:#fff}
-    #status{font-size:.9rem;margin-top:12px;min-height:22px}
+    #status{font-size:.9rem;margin-top:12px;min-height:22px;overflow-wrap:anywhere;white-space:pre-wrap;line-height:1.65}
     progress{width:100%;height:10px;accent-color:#79b990;display:none}
     .item{display:grid;grid-template-columns:minmax(0,1fr) 80px 110px;gap:8px;margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:14px;background:white}
     .item .item-name{grid-column:1/-1}
@@ -53,6 +53,19 @@
     .empty{color:var(--muted);font-size:.9rem}
     @media (max-width:430px){.item{grid-template-columns:minmax(0,1fr) 70px 90px;gap:6px;padding:10px}.item input{padding:8px 6px}.panel{padding:13px}.btns>*{min-width:120px}}
     @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+    @media (max-width:390px){
+      body{padding:12px 8px 36px}
+      main{padding:14px;border-radius:16px}
+      .panel{padding:12px;margin:13px 0}
+      .btns{flex-direction:column}
+      .btns>.file-button{width:100%;min-width:0}
+      .grid{grid-template-columns:minmax(0,1fr)}
+      .item{grid-template-columns:minmax(0,1fr) minmax(75px,0.7fr)}
+      .item .item-name{grid-column:1/-1}
+      .item .item-category{grid-column:1}
+      .item .item-delete{grid-column:2}
+      h1{overflow-wrap:anywhere}
+    }
   </style>
 </head>
 <body>
@@ -83,7 +96,7 @@
     </div>
     <details>
       <summary>読み取った文字を確認・編集する</summary>
-      <p class="hint">認識した文字をそのまま表示しています。修正後に「文字から商品候補を作り直す」を押せます。</p>
+      <p class="hint">認識できた文字をすべて表示します。ここが空白ならOCR自体が失敗しています。修正後に「文字から商品候補を作り直す」を押せます。</p>
       <textarea id="rawText" rows="9" aria-label="レシート認識テキスト"></textarea>
       <button id="parseButton" class="secondary" type="button" style="margin-top:9px">文字から商品候補を作り直す</button>
     </details>
@@ -102,7 +115,7 @@
       <div class="summary-card"><span class="muted">今週の購入金額</span><br><strong id="weekSum">¥0</strong></div>
       <div class="summary-card"><span class="muted">今月の購入金額</span><br><strong id="monthSum">¥0</strong></div>
     </div>
-    <p class="hint">週は月曜日から日曜日です。保存した購入履歴だけを集計します。</p>
+    <p class="hint">週は月曜日から日曜日です。上の「内容を確認して購入履歴に保存」を押すまで、今週・今月の金額は増えません。</p>
     <div id="historyRows"></div>
   </section>
   <p style="text-align:center"><a href="./index.html">← 在庫管理の画面へ戻る</a></p>
@@ -192,22 +205,38 @@
     }
     return '';
   }
+  // 文字認識の表記ゆれ（全角数字・全角英字・全角空白）をそろえる。
+  function cleanLine(s){
+    return sanitizeNums(String(s).normalize('NFKC'))
+      .replace(/[\t　]+/g,' ').replace(/\s{2,}/g,' ').trim();
+  }
   function parseReceipt(raw){
-    const ignore=/(?:合\s*計|小\s*計|お預|お釣|預り|釣銭|消費税|内税|外税|税抜|税込|軽減|割引|値引|クレジット|電子マネー|支払|会計|領収|レシート|ポイント|残高|クーポン|お買上|お買い上げ|店番|電話|TEL|登録番号|インボイス|対象|カード|釣り|交通系|現金|決済|現計|課税|消費|合計金額|おつり)/i;
+    const ignore=/(?:合\s*計|小\s*計|お預|お釣|預り|釣銭|消費税|内税|外税|税抜|税込|軽減税率|割引|値引|クレジット|電子マネー|支払|会計|領収|レシート|ポイント|残高|クーポン|お買上|お買い上げ|店番|電話|TEL|登録番号|インボイス|対象商品|カード|釣り|交通系|現金|決済|現計|課税|消費|合計金額|おつり|お客様|営業時間|毎度|お買い物)/i;
+    const lines=String(raw).split(/\r?\n/).map(cleanLine).filter(Boolean);
     const result=[];
-    for(let line of sanitizeNums(raw).split(/\r?\n/)){
-      line=line.replace(/[\t　]+/g,' ').trim();
-      if(line.length<3||ignore.test(line)||/^(\d{4}[\/\-.年]\d|\d{2}:\d{2}|\d{8,})/.test(line))continue;
-      // 商品名と価格が同じ行にある一般的なレシートを候補として抽出。  
-    line=line.replace(/\s+[A-Za-z]{2,}$/, '');
-    const m=line.match(/^(.{2,55}?)\s+(?:(?:[xX×＊*]\s*(\d{1,2})\s+))?[¥￥]?\s*(\d{2,3}(?:,\d{3})+|\d{2,6})\s*(?:円|[※*＊])?\s*$/);
-      if(!m)continue;
-      let name=m[1].replace(/^[*＊※\-・\s]+/,'').trim();
-　　　　
-      const amount=Number(m[3].replace(/,/g,''));
-      if(!Number.isFinite(amount)||amount>999999)continue;
-      result.push(newRow(name,amount,m[2]||'1'));
-      if(result.length>=80)break;
+    // 同じ行の「りんご 198」「りんご ¥198」「りんご×2 398円」など。
+    const inline=/^(.{1,60}?)(?:\s+|(?=¥))(?:(?:[xX×*]\s*(\d{1,2})\s*))?(?:¥\s*)?(\d{1,3}(?:,\d{3})+|\d{1,6})\s*(?:円)?\s*[※*＊]?$/;
+    // 商品と価格が別の行になったケースも拾う。
+    const onlyPrice=/^(?:¥\s*)?(\d{1,3}(?:,\d{3})+|\d{1,6})\s*(?:円)?\s*[※*＊]?$/;
+    const structural=/^(?:\d{2}[:：]\d{2}|\d{4}[\/\-.年]\d|\d{8,}|No[. ]|\d{1,2}\s*[点個xX×*]\s*\d+|[¥\d,\s※*＊]+)$/i;
+    const validName=name=>name.length>=2 && name.length<=60 && /[ぁ-んァ-ヶ一-龥A-Za-z]/.test(name) && !ignore.test(name) && !structural.test(name);
+    function push(name,amount,qty='1'){
+      name=name.replace(/^[*＊※\-・\s]+/,'').trim();
+      const price=Number(String(amount).replace(/,/g,''));
+      if(!validName(name)||!Number.isInteger(price)||price<1||price>999999)return false;
+      result.push(newRow(name,price,qty));
+      return true;
+    }
+    for(let i=0;i<lines.length&&result.length<80;i++){
+      const line=lines[i];
+      if(ignore.test(line)||structural.test(line))continue;
+      let m=line.match(inline);
+      if(m && push(m[1],m[3],m[2]||'1'))continue;
+      // レシートの列がOCRで分離された場合、次の行を価格として採用。
+      if(i+1<lines.length){
+        m=lines[i+1].match(onlyPrice);
+        if(m && push(line,m[1]))i++;
+      }
     }
     return result;
   }
@@ -230,12 +259,24 @@
     if(!workerPromise){
       workerPromise=(async()=>{
         if(!window.Tesseract){
-          await new Promise((resolve,reject)=>{
-            const script=document.createElement('script');script.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-            script.onload=resolve;script.onerror=()=>reject(new Error('読み取り用ライブラリを取得できませんでした。インターネット接続を確認してください。'));
-            document.head.append(script);
-          });
+          const sources=[
+            'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
+            'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js'
+          ];
+          for(const src of sources){
+            try{
+              await new Promise((resolve,reject)=>{
+                const script=document.createElement('script');
+                script.src=src;script.onload=resolve;
+                script.onerror=()=>reject(new Error('OCRのライブラリの読み込みに失敗'));
+                document.head.append(script);
+              });
+              if(window.Tesseract)break;
+            }catch(e){console.warn('OCRライブラリ取得を再試行します',e);}
+          }
         }
+        if(!window.Tesseract)throw new Error('文字認識のプログラムを取得できませんでした。ネット接続を確認してください。');
+        setStatus('日本語の読み取りデータを準備しています…');
         return window.Tesseract.createWorker(['jpn','eng'],1,{logger:m=>{
           if(typeof m.progress==='number'){
             $('progress').value=Math.round(m.progress*100);
@@ -249,7 +290,7 @@
   async function scan(){
     if(isReading||!chosenFile)return;
     isReading=true;$('readButton').disabled=true;$('progress').style.display='block';$('progress').value=0;
-    $('editor').style.display='none';setStatus('日本語の読み取り準備中です… 初回は少し時間がかかります。');
+    $('editor').style.display='none';setStatus('日本語の読み取り準備中です… 初回は通信が必要です。');
     try {
       const canvas=await createCanvas(chosenFile);
       const worker=await getWorker();
@@ -262,17 +303,31 @@
       draft=parseReceipt(text);
       drawRows();
       $('editor').style.display='block';
-      setStatus(text.trim()?`読み取りが完了しました。商品候補：${draft.length}件。下で内容を確認してください。`:'文字が見つかりませんでした。写真を撮り直すか、商品を手入力してください。');
+      $('rawText').closest('details').open=true;
+      if(!text.trim()){
+        setStatus('画像から文字を検出できませんでした。写真の明るさ・向きを確認してください。下から商品を手入力することもできます。');
+      }else if(!draft.length){
+        setStatus('文字は読み取れましたが、商品と価格を自動抽出できませんでした。下の認識文字を確認し、必要なら修正して「文字から商品候補を作り直す」を押してください。');
+      }else{
+        setStatus('文字認識が完了しました。商品候補：'+draft.length+'件。誤認識がないか確認して保存してください。');
+      }
       $('editor').scrollIntoView({behavior:'smooth',block:'start'});
     } catch(e){
-      setStatus('読み取りに失敗しました：'+(e&&e.message?e.message:String(e)));
-      $('editor').style.display='block';$('purchaseDate').value=today();$('printedTotal').value='';draft=[];drawRows();
+      console.error('レシートOCRのエラー:',e);
+      const reason=e&&e.message?e.message:String(e);
+      const tip=location.protocol==='file:'
+        ? ' このページはMacのローカルファイルとして開かれています。通信を確認しても失敗する場合は、HTTPSで公開したページで試してください。'
+        : ' ネット接続を確認して、もう一度お試しください。';
+      setStatus('読み取りに失敗しました：'+reason+tip+' 下の「＋ 商品を1行追加」で手入力もできます。');
+      $('editor').style.display='block';$('rawText').closest('details').open=true;
+      $('rawText').value='';$('purchaseDate').value=today();$('printedTotal').value='';draft=[];drawRows();
     } finally {isReading=false;$('readButton').disabled=!chosenFile;$('progress').style.display='none';}
   }
   function selectFile(file){
     if(!file)return;
     if(!file.type.startsWith('image/')){setStatus('画像ファイルを選んでください。');return;}
     chosenFile=file;
+    $('rawText').value='';$('printedTotal').value='';draft=[];
     if(imageUrl)URL.revokeObjectURL(imageUrl);
     imageUrl=URL.createObjectURL(file);$('preview').src=imageUrl;$('preview').style.display='block';
     $('readButton').disabled=false;$('editor').style.display='none';setStatus('写真を選択しました。「文字を読み取る」を押してください。');
@@ -337,7 +392,7 @@
   $('parseButton').addEventListener('click',()=>{
     draft=parseReceipt($('rawText').value);const d=detectDate($('rawText').value);if(d)$('purchaseDate').value=d;
     const total=detectTotal($('rawText').value);if(total!=='')$('printedTotal').value=total;
-    drawRows();
+    drawRows();$('editor').style.display='block';setStatus('商品候補：'+draft.length+'件。内容を確認してください。');
   });
   $('addItem').addEventListener('click',()=>{draft.push(newRow());drawRows();});
   $('printedTotal').addEventListener('input',updateTotal);
