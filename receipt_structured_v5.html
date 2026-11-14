@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f1f9ee">
+  <title>レシート読み取り｜わが家の在庫管理</title>
+  <style>
+    :root{color-scheme:light;--green:#367550;--ink:#31473a;--mint:#eaf6e9;--pink:#fae9ee;--line:#dcebdc;--muted:#65786a}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;min-width:0;overflow-x:hidden;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;color:var(--ink);background-color:#f0faef;background-image:radial-gradient(circle at 24px 25px,#c7e7c7 0 2px,transparent 3px),radial-gradient(circle at 84px 78px,#d8ecd4 0 2px,transparent 3px);background-size:120px 120px;padding:18px 12px 50px}
+    main{width:100%;min-width:0;max-width:690px;margin:0 auto;background:#ffffffee;border-radius:24px;box-shadow:0 12px 28px #517a5e15;padding:clamp(16px,4vw,32px)}
+    h1{font-size:clamp(1.25rem,4vw,1.8rem);color:var(--green);line-height:1.5;margin:0 0 8px}
+    h2{font-size:1.1rem;color:var(--green);margin:4px 0 12px}
+    p{line-height:1.7;margin:6px 0 14px}
+    a{color:#357958}
+    .muted,.hint{color:var(--muted);font-size:.86rem}
+    .panel{border:1px solid var(--line);background:#fafff9;border-radius:18px;padding:16px;margin:18px 0}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .field{display:flex;flex-direction:column;gap:5px;min-width:0}
+    label.field>span,.label{font-size:.82rem;color:var(--muted);font-weight:650}
+    input,select,textarea,button{font:inherit}
+    input:not([type=file]),select,textarea{width:100%;min-width:0;background:white;border:1px solid #c5d9ca;border-radius:11px;padding:11px;color:var(--ink);font-size:16px}
+    textarea{resize:vertical;line-height:1.6}
+    button,.file-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;border-radius:12px;padding:11px 14px;border:1px solid #a0c7a7;cursor:pointer;background:#e4f4e6;color:#326b45;font-weight:700;text-align:center;text-decoration:none}
+    button.primary,.file-button.primary{background:#7fc695;border-color:#7fc695;color:#123e23}
+    button.secondary{background:#fff;border-color:#d4e6d7}
+    button.danger{background:#fff0f1;border-color:#f3d5d8;color:#9a4a59}
+    button:disabled{cursor:not-allowed;opacity:.5}
+    button:focus-visible,.file-button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid #a8d9bc;outline-offset:2px}
+    .btns{display:flex;gap:9px;flex-wrap:wrap}
+    .btns>*{flex:1;min-width:140px}
+    input[type=file]{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
+    #preview{display:none;max-width:100%;max-height:350px;object-fit:contain;margin:14px auto 4px;border-radius:10px;border:1px solid var(--line);background:#fff}
+    #status{font-size:.9rem;margin-top:12px;min-height:22px;overflow-wrap:anywhere;white-space:pre-wrap;line-height:1.65}
+    progress{width:100%;height:10px;accent-color:#79b990;display:none}
+    .item{display:grid;grid-template-columns:minmax(0,1fr) 80px 110px;gap:8px;margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:14px;background:white}
+    .item .item-name{grid-column:1/-1}
+    .item .item-category{grid-column:1/3}
+    .item .item-delete{grid-column:3}
+    .item input{padding:9px}
+    .subtotal{text-align:right;font-size:1.08rem;font-weight:700;margin:14px 2px}
+    #editor,#history{display:none}
+    .notice{font-size:.86rem;background:#fff8e7;border:1px solid #f1e1b0;padding:10px;border-radius:10px;line-height:1.6}
+    .receipt{padding:12px 0;border-top:1px solid var(--line)}
+    .receipt .head{display:flex;justify-content:space-between;gap:8px;align-items:start}
+    .receipt .line{display:flex;justify-content:space-between;gap:10px;font-size:.89rem;margin:6px 0}
+    .receipt .line span:first-child{overflow-wrap:anywhere}
+    .receipt details{margin-top:7px}
+    .receipt summary{color:#477b59;cursor:pointer}
+    .summary-card{padding:13px;border-radius:13px;background:var(--mint)}
+    .summary-card strong{font-size:1.3rem;color:var(--green)}
+    .empty{color:var(--muted);font-size:.9rem}
+    @media (max-width:430px){.item{grid-template-columns:minmax(0,1fr) 70px 90px;gap:6px;padding:10px}.item input{padding:8px 6px}.panel{padding:13px}.btns>*{min-width:120px}}
+    @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+    @media (max-width:390px){
+      body{padding:12px 8px 36px}
+      main{padding:14px;border-radius:16px}
+      .panel{padding:12px;margin:13px 0}
+      .btns{flex-direction:column}
+      .btns>.file-button{width:100%;min-width:0}
+      .grid{grid-template-columns:minmax(0,1fr)}
+      .item{grid-template-columns:minmax(0,1fr) minmax(75px,0.7fr)}
+      .item .item-name{grid-column:1/-1}
+      .item .item-category{grid-column:1}
+      .item .item-delete{grid-column:2}
+      h1{overflow-wrap:anywhere}
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>🍅 レシートを撮って登録 🥦</h1>
+  <p class="muted">わが家の在庫管理・撮影お試し版（商品名と¥価格を行ごとに読む実験版 v5）　🐬</p>
+  <p>レシートを撮影すると文字を読み取り、商品名や金額の候補を表示します。間違いは直してから保存できます。</p>
+  <div class="panel">
+    <h2>① レシートを撮影</h2>
+    <div class="btns">
+      <label class="file-button primary" for="cameraFile">📷 カメラで撮影</label>
+      <input id="cameraFile" type="file" accept="image/*" capture="environment">
+      <label class="file-button" for="photoFile">🖼️ 写真から選ぶ</label>
+      <input id="photoFile" type="file" accept="image/*">
+    </div>
+    <img id="preview" alt="撮影したレシートのプレビュー">
+    <p class="hint">レシートの上下と左右がすべて入るように、できるだけ正面から撮影してください。商品の行を探し、左側の商品名と右側の¥金額を組み合わせます。読み間違いは保存前に修正できます。初回は通信が必要です。</p>
+    <button class="primary" id="readButton" type="button" disabled>商品名と金額を行ごとに読み取る</button>
+    <div id="status" role="status" aria-live="polite">写真を選んでください。</div>
+    <progress id="progress" value="0" max="100"></progress>
+  </div>
+  <section id="editor" class="panel">
+    <h2>② 読み取り内容を確認・修正</h2>
+    <p class="notice">⚠️ 無料の文字認識では、文字の誤読・商品漏れが起こります。レシートの印字と照合してから保存してください。金額はその行の商品合計です。</p>
+    <div class="grid" style="margin:15px 0">
+      <label class="field"><span>購入日</span><input id="purchaseDate" type="date"></label>
+      <label class="field"><span>税込の支払合計（任意）</span><input id="printedTotal" type="number" min="0" step="1" placeholder="例：1580"></label>
+    </div>
+    <details>
+      <summary>読み取った文字を確認・編集する</summary>
+      <p class="hint">認識できた文字をすべて表示します。ここが空白ならOCR自体が失敗しています。修正後に「文字から商品候補を作り直す」を押せます。</p>
+      <textarea id="rawText" rows="9" aria-label="レシート認識テキスト"></textarea>
+      <details id="alternateBox" style="display:none;margin:10px 0">
+        <summary>別の読み取り方法の結果を見る</summary>
+        <p class="hint">通常画像と補正画像で違う結果になった場合、ここに別候補を表示します。内容を確認して切り替えられます。</p>
+        <textarea id="alternateText" rows="7" aria-label="別のOCR候補" readonly></textarea>
+        <button id="useAlternate" type="button" class="secondary" style="margin-top:9px">この候補を商品一覧に使う</button>
+      </details>
+      <button id="parseButton" class="secondary" type="button" style="margin-top:9px">文字から商品候補を作り直す</button>
+    </details>
+    <details class="notice" id="positionDetails" style="margin-top:14px;display:none">
+      <summary>詳しい読み取り情報（問題があったときだけ開く）</summary>
+      <pre id="positionDebug" style="font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+    </details>
+    <h2 style="margin-top:20px">商品一覧</h2>
+    <p class="hint">名前・数量・金額・分類を修正できます。誤検出の行は削除してください。</p>
+    <div id="itemRows"></div>
+    <button id="addItem" class="secondary" type="button">＋ 商品を1行追加</button>
+    <div class="subtotal" id="draftTotal">商品合計：¥0</div>
+    <p class="hint" id="compareMessage"></p>
+    <button id="saveButton" class="primary" type="button" style="width:100%">内容を確認して購入履歴に保存</button>
+    <p class="hint">写真そのものは保存しません。購入情報だけをこのブラウザに保存します。税込の支払合計を入力して保存すると、週・月の金額には税込支払合計を使用します。現在の在庫数量は変更しません。</p>
+  </section>
+  <section id="history" class="panel">
+    <h2>③ 保存した購入履歴</h2>
+    <div class="grid" style="margin-bottom:14px">
+      <div class="summary-card"><span class="muted">今週の購入金額</span><br><strong id="weekSum">¥0</strong></div>
+      <div class="summary-card"><span class="muted">今月の購入金額</span><br><strong id="monthSum">¥0</strong></div>
+    </div>
+    <p class="hint">⚠️ v5テスト版です。本番アプリとは別の履歴に保存し、本番の購入情報は変更しません。週は月曜日から日曜日です。レシートの税込合計が入力されている場合はその金額で集計します。</p>
+    <div id="historyRows"></div>
+  </section>
+  <p style="text-align:center"><a href="./index.html">← 在庫管理の画面へ戻る</a></p>
+</main>
+<script>
+(() => {
+  'use strict';
+  const KEY = 'stockAppPurchaseHistoryPositionV5Test'; // 検証版は本番の購入履歴を書き換えない
+  const $ = id => document.getElementById(id);
+  const yen = n => '¥' + Number(n || 0).toLocaleString('ja-JP');
+  const localDay = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const today = () => localDay(new Date());
+  let imageUrl = null;
+  let chosenFile = null;
+  let rowSerial = 0;
+  let draft = [];
+  let workerPromise = null;
+  let isReading = false;
+  let alternateOCR = '';
+  const sanitizeNums = s => s.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-65248))
+    .replace(/[，、]/g,',').replace(/[￥]/g,'¥').replace(/[．]/g,'.');
+  function readHistory() {
+    try { const v=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(v)?v:[]; }
+    catch(e) { return []; }
+  }
+  function setStatus(message){$('status').textContent=message;}
+  function inputChanged(ev){
+    const id=Number(ev.target.closest('.item')?.dataset.id);
+    const row=draft.find(x=>x.id===id);
+    if(!row)return;
+    row[ev.target.dataset.field]=ev.target.value;
+    updateTotal();
+  }
+  function updateTotal(){
+    const sum=draft.reduce((n,row)=>n+Math.max(0,Number(row.amount)||0),0);
+    $('draftTotal').textContent='商品合計：'+yen(sum);
+    const printed=Number($('printedTotal').value);
+    $('compareMessage').textContent=$('printedTotal').value!=='' && Math.round(printed)!==Math.round(sum)
+      ? `税込の支払合計（${yen(printed)}）と商品小計（${yen(sum)}）の差は${yen(printed-sum)}です。税金・値引き・読み取り漏れを確認してください。保存すると支払合計で集計します。`
+      : '';
+  }
+  function drawRows(){
+    const box=$('itemRows'); box.replaceChildren();
+    if(!draft.length){
+      const empty=document.createElement('p');empty.className='empty';empty.textContent='商品候補が見つかりませんでした。「＋ 商品を1行追加」から入力できます。';box.append(empty);
+    }
+    for(const r of draft){
+      const holder=document.createElement('div');holder.className='item';holder.dataset.id=String(r.id);
+      const field=(title,key,type,extra='')=>{
+        const l=document.createElement('label');l.className='field';l.innerHTML=`<span>${title}</span>`;
+        const i=document.createElement('input');i.type=type;i.dataset.field=key;i.value=String(r[key]);i.setAttribute('aria-label',title);if(extra)i.min=extra;i.addEventListener('input',inputChanged);l.append(i);return l;
+      };
+      const name=field('商品名','name','text');name.classList.add('item-name');
+      const qty=field('数量','quantity','number','1');
+      const amount=field('購入金額（円）','amount','number','0');
+      const category=document.createElement('label');category.className='field item-category';category.innerHTML='<span>分類</span>';
+      const select=document.createElement('select');select.dataset.field='category';
+      for(const s of ['食品','日用品','その他']){const o=document.createElement('option');o.value=s;o.textContent=s;select.append(o);}
+      select.value=r.category;select.addEventListener('change',inputChanged);category.append(select);
+      const del=document.createElement('button');del.type='button';del.className='danger item-delete';del.textContent='削除';
+      del.setAttribute('aria-label',`${r.name||'項目'}を一覧から削除`);
+      del.addEventListener('click',()=>{draft=draft.filter(x=>x.id!==r.id);drawRows();});
+      holder.append(name,qty,amount,category,del);box.append(holder);
+    }
+    updateTotal();
+  }
+  function guessCategory(name){
+    return /レジ袋|ソフィ|サニタリ|クリニカ|歯間|歯ブラシ|歯みがき|デンタル|デオコ|シャンプー|洗剤|柔軟剤|ティッシュ|トイレ|ナプキン|石けん|歯磨|ボディソープ/i.test(name)?'日用品':'食品';
+  }
+  function newRow(name='',amount='',quantity='1'){
+    return {id:++rowSerial,name,quantity:String(quantity),amount:String(amount),category:guessCategory(name)};
+  }
+  function detectDate(raw){
+    const t=sanitizeNums(raw);
+    let m=t.match(/(20\d{2})\s*[年\/\-.]\s*(\d{1,2})\s*[月\/\-.]\s*(\d{1,2})\s*日?/);
+    if(!m) {
+      const short=t.match(/(?:^|\s)(\d{2})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?:\s|$)/);
+      if(short)m=[short[0],String(2000+Number(short[1])),short[2],short[3]];
+    }
+    if(!m)return '';
+    const yyyy=Number(m[1]),mm=Number(m[2]),dd=Number(m[3]);
+    const test=new Date(yyyy,mm-1,dd);
+    if(test.getFullYear()!==yyyy || test.getMonth()+1!==mm || test.getDate()!==dd)return '';
+    return localDay(test);
+  }
+  function detectTotal(raw){
+    for(const original of String(raw).split(/\r?\n/)){
+      const line=cleanLine(original);
+      // 「小計」は税抜商品小計であることが多いため、合計より優先しない。
+      if(/小\s*計/.test(line) && !/総合計|税込合計/.test(line))continue;
+      const m=line.match(/(?:お買上[げ]?合計|お買い上げ合計|総合計|税込合計|支払合計|^\s*合\s*計|現\s*計)\s*[:：]?\s*[¥￥]?\s*(\d{1,3}(?:,\d{3})+|\d{1,7})/);
+      if(m)return Number(m[1].replace(/,/g,''));
+    }
+    return '';
+  }
+  function cleanLine(s){
+    return sanitizeNums(String(s).normalize('NFKC'))
+      .replace(/[\t　]+/g,' ').replace(/\s{2,}/g,' ').trim();
+  }
+  function parseReceipt(raw){
+    const ignore=/(?:合\s*計|小\s*計|お預|お釣|預り|釣銭|消費税|内税|外税|税抜|税込|軽減税率|割引|値引|クレジット|電子マネー|支払|会計|領収|レシート|ポイント|残高|クーポン|お買上|お買い上げ|店番|電話|TEL|登録番号|インボイス|対象商品|カード|交通系|現金|決済|現計|課税|合計金額|おつり|お客様|営業時間|毎度|お買い物|税額|税抜対象額)/i;
+    const lines=String(raw).split(/\r?\n/).map(cleanLine).filter(Boolean);
+    const result=[];
+    const pricePattern='(\\d{1,3}(?:,\\d{3})+|\\d{1,7})';
+    const inline=new RegExp('^(.{2,65}?)\\s+(?:([xX×*]\\s*\\d{1,2})\\s+)?(?:特\\s*)?(?:¥\\s*)?'+pricePattern+'\\s*(?:円|内|外|非)?\\s*[※*＊]?\\s*$');
+    const onlyPrice=/^(?:¥\s*)?(\d{1,3}(?:,\d{3})+|\d{1,7})\s*(?:円|内|外)?\s*[※*＊]?$/;
+    const structural=/^(?:\d{2}[:：]\d{2}|\d{4}[\/\-.年]\d|\d{8,}|No[. ]|[@＠]\s*\d+|\d+\s*[点個xX×*]\s*\d+|[¥\d,\s※*＊]+)$/i;
+    const validName=name=>name.length>=2 && name.length<=65 && /[ぁ-んァ-ヶ一-龥A-Za-z]/.test(name) && !ignore.test(name) && !structural.test(name);
+    function push(name,amount,qty='1'){
+      name=name.replace(/^[*＊※\-・\s]+/,'').replace(/\s+特$/,'').replace(/\s*\d{1,2}\s*枚$/,'').trim();
+      const price=Number(String(amount).replace(/,/g,''));
+      if(!validName(name)||!Number.isInteger(price)||price<1||price>999999)return false;
+      result.push(newRow(name,price,qty));
+      return true;
+    }
+    for(let i=0;i<lines.length&&result.length<80;i++){
+      const line=lines[i];
+      if(ignore.test(line)||structural.test(line))continue;
+      let m=line.match(inline);
+      let added=false;
+      if(m)added=push(m[1],m[3],m[2]?m[2].replace(/[xX×*\s]/g,''):'1');
+      if(!added && i+1<lines.length){
+        m=lines[i+1].match(onlyPrice);
+        if(m && push(line,m[1])){i++;added=true;}
+      }
+      if(added && i+1<lines.length){
+        // 「@148 × 2個」が次の行にある場合、購入金額296円は維持し数量だけ2個に。
+        const qtyMatch=lines[i+1].match(/^\(?\s*[@＠]\s*[¥￥]?\s*\d{1,7}\s*[xX×*]\s*(\d{1,2})\s*個?\s*\)?$/);
+        if(qtyMatch && result.length){result[result.length-1].quantity=qtyMatch[1];i++;}
+      }
+    }
+    return result;
+  }
+  // 画像の文字を濃く、紙面を明るくする。原画像も残し、2つの認識結果を比較する。
+  function enhanceCanvas(source){
+    const dest=document.createElement('canvas');
+    dest.width=source.width;dest.height=source.height;
+    const ctx=dest.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(source,0,0);
+    const image=ctx.getImageData(0,0,dest.width,dest.height),d=image.data;
+    for(let p=0;p<d.length;p+=4){
+      const gray=.299*d[p]+.587*d[p+1]+.114*d[p+2];
+      const contrast=Math.max(0,Math.min(255,214+(gray-185)*1.75));
+      d[p]=d[p+1]=d[p+2]=contrast;
+    }
+    ctx.putImageData(image,0,0);
+    return dest;
+  }
+  function ocrScore(text){
+    const parsed=parseReceipt(text);
+    const japanese=(String(text).match(/[ぁ-んァ-ヶ一-龥]/g)||[]).length;
+    const count=String(text).split(/\r?\n/).filter(s=>s.trim().length>=3).length;
+    return parsed.length*22+(detectTotal(text)!==''?40:0)+(detectDate(text)?8:0)+Math.min(90,japanese)+Math.min(30,count);
+  }
+  function applyRecognizedText(text){
+    $('rawText').value=text;
+    $('purchaseDate').value=detectDate(text)||today();
+    $('printedTotal').value=detectTotal(text);
+    draft=parseReceipt(text);
+    drawRows();
+  }
+  function createCanvas(file){
+    return new Promise((resolve,reject)=>{
+      const url=URL.createObjectURL(file),img=new Image();
+      img.onload=()=>{
+        try {
+     const scale=Math.min(2.15,1650/img.naturalWidth,2600/img.naturalHeight);     
+          const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+          const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0,canvas.width,canvas.height);
+          URL.revokeObjectURL(url);resolve(canvas);
+        } catch(e){URL.revokeObjectURL(url);reject(e);}
+      };
+      img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('画像が開けませんでした。JPEGまたはPNGでお試しください。'));};
+      img.src=url;
+    });
+  }
+  async function getWorker(){
+    if(!workerPromise){
+      workerPromise=(async()=>{
+        if(!window.Tesseract){
+          const sources=[
+            'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
+            'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js'
+          ];
+          for(const src of sources){
+            try{
+              await new Promise((resolve,reject)=>{
+                const script=document.createElement('script');
+                script.src=src;script.onload=resolve;
+                script.onerror=()=>reject(new Error('OCRのライブラリの読み込みに失敗'));
+                document.head.append(script);
+              });
+              if(window.Tesseract)break;
+            }catch(e){console.warn('OCRライブラリ取得を再試行します',e);}
+          }
+        }
+        if(!window.Tesseract)throw new Error('文字認識のプログラムを取得できませんでした。ネット接続を確認してください。');
+        setStatus('日本語の読み取りデータを準備しています…');
+        return window.Tesseract.createWorker(['jpn','eng'],1,{logger:m=>{
+          if(typeof m.progress==='number'){
+            $('progress').value=Math.round(m.progress*100);
+            if(m.status==='recognizing text')setStatus('文字を認識しています… '+Math.round(m.progress*100)+'%');
+          }
+        }});
+      })().catch(e=>{workerPromise=null;throw e;});
+    }
+    return workerPromise;
+  }
+  // 文字認識には既存のTesseract.jsを使用し、TSVに記録された「文字の座標」を利用する。
+  function tsvLines(tsv, offsetX=0, offsetY=0) {
+    if(!tsv || typeof tsv !== 'string')return [];
+    const grouped=new Map();
+    for(const row of tsv.split(/\r?\n/).slice(1)){
+      const c=row.split('\t');
+      if(c.length<12 || c[0]!=='5')continue;
+      const word=c.slice(11).join('\t').trim();
+      const x=Number(c[6]),y=Number(c[7]),w=Number(c[8]),h=Number(c[9]);
+      if(!word || ![x,y,w,h].every(Number.isFinite)||w<=0||h<=0)continue;
+      const key=c.slice(1,5).join('/');
+      if(!grouped.has(key))grouped.set(key,[]);
+      grouped.get(key).push({text:word,x:x+offsetX,y:y+offsetY,w,h});
+    }
+    // 同じ行でも異なるブロックとして認識される場合があるため、近い高さの行を結合する。
+    const unmerged=[...grouped.values()].map(words=>{
+      words.sort((a,b)=>a.x-b.x);
+      const y=Math.min(...words.map(w=>w.y));
+      const bottom=Math.max(...words.map(w=>w.y+w.h));
+      return {words,y,h:bottom-y,cy:(y+bottom)/2};
+    }).sort((a,b)=>a.cy-b.cy);
+    const merged=[];
+    for(const line of unmerged){
+      const near=merged.find(x=>Math.abs(x.cy-line.cy)<Math.max(16,Math.min(32,Math.min(x.h,line.h)*0.65)));
+      if(near){
+        near.words.push(...line.words);
+        near.y=Math.min(near.y,line.y);
+        const bottom=Math.max(near.cy+near.h/2,line.cy+line.h/2);
+        near.h=bottom-near.y;near.cy=(near.y+bottom)/2;
+      }else merged.push({...line,words:line.words.slice()});
+    }
+    for(const line of merged){
+      line.words.sort((a,b)=>a.x-b.x);
+      line.x=Math.min(...line.words.map(w=>w.x));
+      line.text=line.words.map(w=>w.text).join(' ').trim();
+    }
+    return merged.sort((a,b)=>a.cy-b.cy);
+  }
+  function cropCanvas(source,x0,x1){
+    const x=Math.max(0,Math.floor(source.width*x0));
+    const width=Math.max(1,Math.min(source.width-x,Math.ceil(source.width*(x1-x0))));
+    const canvas=document.createElement('canvas');canvas.width=width;canvas.height=source.height;
+    canvas.getContext('2d').drawImage(source,x,0,width,source.height,0,0,width,source.height);
+    return {canvas,offsetX:x};
+  }
+  function amountFromColumn(line){
+    // 価格欄に「特」「内」などが混ざっていても、最も右の数値を拾う。
+    const txt=sanitizeNums(line.text.normalize('NFKC'))
+      .replace(/[Oo〇]/g,'0').replace(/\s+/g,'').replace(/，/g,',');
+    const matches=[...txt.matchAll(/\d{1,3}(?:,\d{3})+|\d{1,7}/g)];
+    if(!matches.length)return null;
+    const value=Number(matches[matches.length-1][0].replace(/,/g,''));
+    return Number.isInteger(value)&&value>0&&value<1000000?value:null;
+  }
+  const summaryLabel=/(?:小\s*計|合\s*計|税額|税抜|対象額|カード|決済|Master|Visa|合計金額|レジ袋代以外の合計)/i;
+  const skipLabel=/(?:店\s*[:：]|レジ\s*(?:No|番号|[:：]|\d)|No\.?\s*[:：]|TEL|静岡|電話|小計|合計|税額|対象額|消費税|税抜|カード|Master|Visa|お釣|預り|お預|クレジット|ポイント|支払|領収|登録番号|お買上|決済)/i;
+  function cleanProductName(raw){
+    return cleanLine(raw)
+      .replace(/[¥￥]\s*[\d,]+.*$/,'')
+      .replace(/\b\d{1,3}(?:,\d{3})+\s*$/,'')
+      .replace(/\s+(?:特\s*)?\d{1,6}\s*(?:円|内|外)?\s*$/,'')
+      .replace(/\s*\d+\s*(?:枚|点)\s*$/,'')
+      .replace(/^[※*＊\-・\s]+/,'')
+      .trim();
+  }
+  function extractByPosition(leftLines,rightLines,fullText,width,height){
+    const minimumY=height*0.15;
+    const limitX=width*0.615;
+    const priceLines=rightLines
+      .filter(l=>l.cy>minimumY && l.words.some(w=>w.x+w.w/2>limitX))
+      .map(l=>({...l,amount:amountFromColumn(l)}))
+      .filter(l=>l.amount!==null)
+      .sort((a,b)=>a.cy-b.cy);
+    const labelLines=leftLines.filter(l=>summaryLabel.test(l.text));
+    let boundary=Math.min(...leftLines.filter(l=>/小\s*計/.test(l.text)).map(l=>l.cy));
+    if(!Number.isFinite(boundary)){
+      // 「小計」の認識に失敗したときは、通常の商品行の間隔より大きな空白を探す。
+      const gaps=priceLines.slice(1).map((p,i)=>p.cy-priceLines[i].cy);
+      const reasonable=gaps.filter(g=>g>12&&g<135).sort((a,b)=>a-b);
+      const typical=reasonable.length?reasonable[Math.floor(reasonable.length/2)]:55;
+      boundary=height*0.95;
+      for(let i=3;i<priceLines.length;i++){
+        if(priceLines[i].cy-priceLines[i-1].cy>Math.max(130,typical*2.15)){
+          boundary=(priceLines[i].cy+priceLines[i-1].cy)/2;
+          break;
+        }
+      }
+    }
+    let result=[];
+    const assigned=new Set();
+    const debug=[];
+    for(const p of priceLines.filter(l=>l.cy<boundary)){
+      const close=leftLines.filter(l=>
+        Math.abs(l.cy-p.cy)<Math.max(28,Math.min(85,1.4*Math.max(p.h,l.h))) &&
+        !skipLabel.test(l.text) &&
+        l.cy>minimumY &&
+        l.x<width*0.7
+      ).sort((a,b)=>Math.abs(a.cy-p.cy)-Math.abs(b.cy-p.cy));
+      const line=close.find(l=>!assigned.has(l))||close[0];
+      if(line)assigned.add(line);
+      const candidate=line?cleanProductName(line.text):'';
+      const name=candidate.length>=2 && /[ぁ-んァ-ヶ一-龥A-Za-z]/.test(candidate) && !/^\d{4}/.test(candidate)
+        ? candidate : '【要確認】商品名';
+      debug.push(`${Math.round(p.cy)}px  ${name}  ¥${p.amount.toLocaleString('ja-JP')}`);
+      result.push(newRow(name,p.amount,'1'));
+    }
+    // 数量が別行に印字されるレシート（@148 × 2個 など）
+    for(const l of leftLines){
+      const m=cleanLine(l.text).match(/[@＠]\s*[¥￥]?\s*\d{1,6}\s*[xX×*]\s*(\d{1,2})\s*個?/);
+      if(!m || !result.length)continue;
+      const prev=priceLines.filter(p=>p.cy<l.cy && p.cy<boundary).at(-1);
+      if(!prev)continue;
+      const ix=priceLines.filter(p=>p.cy<boundary).indexOf(prev);
+      if(ix>=0&&result[ix])result[ix].quantity=m[1];
+    }
+    // 「合計」の位置に最も近い右側の金額だけを、税込支払合計とする。
+    let total=null;
+    const totals=labelLines.filter(l=>/合\s*計/.test(l.text)&&!/小\s*計/.test(l.text));
+    for(const line of totals){
+      const nearest=priceLines.slice().sort((a,b)=>Math.abs(a.cy-line.cy)-Math.abs(b.cy-line.cy))[0];
+      if(nearest && Math.abs(nearest.cy-line.cy)<Math.max(50,2*line.h)){
+        total=nearest.amount;
+        break;
+      }
+    }
+    if(total===null){
+      const raw=detectTotal(fullText);
+      if(raw!=='')total=raw;
+    }
+    if(total===null){
+      // ここでは推測値を自動保存しない。合計欄で未認識と表示し、本人が確認できるようにする。
+      debug.push('税込合計: 未認識（「合計」の文字と金額を確認してください）');
+    }else debug.push('税込合計: ¥'+total.toLocaleString('ja-JP'));
+    debug.push('商品候補: '+result.length+'行 / 価格の認識: '+priceLines.length+'行');
+    return {items:result,total,debug:debug.join('\n')};
+  }
+  // v5: レシート画像の影・色むらを小さくする。紙の明るさを64pxごとに推定する。
+  // 色を補正するだけであり、存在しない文字を作る処理ではない。
+  function correctShadows(original){
+    const result=document.createElement('canvas');result.width=original.width;result.height=original.height;
+    const cx=result.getContext('2d',{willReadFrequently:true});cx.drawImage(original,0,0);
+    const img=cx.getImageData(0,0,result.width,result.height),p=img.data;
+    const step=64,cols=Math.ceil(result.width/step),rows=Math.ceil(result.height/step);
+    const white=new Float32Array(cols*rows);
+    // 紙面の明るい部分を推定する。黒い文字は背景推定に使わない。
+    for(let by=0;by<rows;by++)for(let bx=0;bx<cols;bx++){
+      const sample=[];
+      for(let y=by*step;y<Math.min((by+1)*step,result.height);y+=8)
+        for(let x=bx*step;x<Math.min((bx+1)*step,result.width);x+=8){
+          const k=(y*result.width+x)*4;
+          sample.push(.299*p[k]+.587*p[k+1]+.114*p[k+2]);
+        }
+      sample.sort((a,b)=>a-b);
+      white[by*cols+bx]=Math.max(65,sample[Math.floor(sample.length*.82)]||190);
+    }
+    for(let y=0;y<result.height;y++){
+      const by=Math.min(rows-1,Math.floor(y/step));
+      for(let x=0;x<result.width;x++){
+        const bx=Math.min(cols-1,Math.floor(x/step));
+        const bg=white[by*cols+bx];
+        const k=(y*result.width+x)*4;
+        const gray=.299*p[k]+.587*p[k+1]+.114*p[k+2];
+        const corrected=Math.max(0,Math.min(255,gray*238/bg));
+        p[k]=p[k+1]=p[k+2]=corrected;
+      }
+    }
+    cx.putImageData(img,0,0);
+    return result;
+  }
+  function rawTSVWords(tsv,xOffset=0){
+    if(typeof tsv!=='string')return [];
+    const words=[];
+    for(const line of tsv.split(/\r?\n/).slice(1)){
+      const col=line.split('\t');if(col.length<12||col[0]!=='5')continue;
+      const t=col.slice(11).join('\t').trim();
+      const [x,y,w,h]=[6,7,8,9].map(i=>Number(col[i]));
+      if(!t||![x,y,w,h].every(Number.isFinite)||w<=0||h<=0)continue;
+      words.push({text:t,x:x+xOffset,y,w,h,cy:y+h/2});
+    }
+    return words;
+  }
+  function groupWords(words){
+    const groups=[];
+    for(const w of [...words].sort((a,b)=>a.cy-b.cy)){
+      const g=groups.find(g=>Math.abs(g.cy-w.cy)<Math.max(12,Math.min(28,w.h*.48)));
+      if(g){g.words.push(w);g.cy=g.words.reduce((s,z)=>s+z.cy,0)/g.words.length;}
+      else groups.push({words:[w],cy:w.cy});
+    }
+    return groups.map(g=>({cy:g.cy,text:g.words.sort((a,b)=>a.x-b.x).map(w=>w.text).join(' '),words:g.words})).sort((a,b)=>a.cy-b.cy);
+  }
+  // 金額列の画像から、商品名を認識できなくても「行がある高さ」を調べる。
+  // OCRのテキスト改行に依存しないため、行が乱れたレシートでも候補を残せる。
+  function detectPriceRowsFromPixels(canvas){
+    const w=canvas.width,h=canvas.height;
+    const d=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data;
+    const counts=new Float32Array(h);
+    const left=Math.round(w*.61),right=Math.round(w*.87);
+    for(let y=Math.floor(h*.24);y<Math.floor(h*.95);y++){
+      let count=0;
+      for(let x=left;x<right;x+=3){const k=(y*w+x)*4;if(d[k]<145)count++;}
+      counts[y]=count;
+    }
+    const avg=new Float32Array(h);
+    for(let y=5;y<h-5;y++){
+      let s=0;for(let k=-5;k<=5;k++)s+=counts[y+k];avg[y]=s/11;
+    }
+    const peaks=[];
+    const minScore=Math.max(9,(right-left)/3*.08);
+    for(let y=Math.floor(h*.24)+6;y<Math.floor(h*.95)-6;y++){
+      if(avg[y]<minScore)continue;
+      if(avg[y]>=avg[y-5]&&avg[y]>avg[y+5])peaks.push({cy:y,score:avg[y]});
+    }
+    const picked=[];
+    const spacing=Math.max(32,Math.round(w*.035));
+    for(const peak of peaks.sort((a,b)=>b.score-a.score)){
+      if(picked.every(p=>Math.abs(p.cy-peak.cy)>spacing))picked.push(peak);
+      if(picked.length>=30)break;
+    }
+    return picked.sort((a,b)=>a.cy-b.cy);
+  }
+  function mergeCandidateRows(ocrWords,numberWords,pixelRows,w,h){
+    const prices=groupWords([...numberWords,...ocrWords.filter(x=>x.x>w*.56)]);
+    const rows=prices.filter(l=>l.cy>h*.25&&l.cy<h*.96).map(l=>({cy:l.cy,score:70}));
+    // 価格欄がOCRでほとんど取れない場合は、画素から求めた候補を使う。
+    if(rows.length<6)rows.push(...pixelRows.map(p=>({cy:p.cy,score:Math.min(45,p.score)})));
+    const merged=[];
+    for(const row of rows.sort((a,b)=>b.score-a.score)){
+      if(merged.every(r=>Math.abs(r.cy-row.cy)>Math.max(30,w*.031)))merged.push(row);
+    }
+    return merged.sort((a,b)=>a.cy-b.cy).slice(0,22);
+  }
+  function cropBand(source,cy,x0,x1){
+    const h=source.height,w=source.width;
+    const pad=Math.max(30,Math.round(w*.031));
+    const top=Math.max(0,Math.floor(cy-pad));
+    const bottom=Math.min(h,Math.ceil(cy+pad));
+    const left=Math.max(0,Math.floor(w*x0));
+    const right=Math.min(w,Math.ceil(w*x1));
+    const out=document.createElement('canvas');out.width=Math.max(1,right-left);out.height=Math.max(1,bottom-top);
+    out.getContext('2d').drawImage(source,left,top,out.width,out.height,0,0,out.width,out.height);
+    return out;
+  }
+  function rightmostPrice(text){
+    const normalized=sanitizeNums(String(text||'').normalize('NFKC'));
+    // 右端の価格表記に限定。日付や商品コードをなるべく避ける。
+    const m=normalized.match(/(?:[¥￥]\s*)?(\d{1,3}(?:\s*,\s*\d{3})+|\d{1,6})\s*(?:円|内|外|非)?\s*$/);
+    if(!m)return null;
+    const price=Number(m[1].replace(/[\s,]/g,''));
+    return Number.isInteger(price)&&price>0&&price<=999999?price:null;
+  }
+  function leftOfPrice(text){
+    const raw=String(text||'').trim();
+    return raw.replace(/\s*(?:特\s*)?[¥￥]?\s*(?:\d{1,3}(?:[,，]\d{3})+|\d{1,6})\s*(?:円|内|外|非)?\s*$/,'')
+      .replace(/\s+[特¥￥]\s*$/,'').trim();
+  }
+  const NOT_ITEM=/(?:小\s*計|合\s*計|税額|税抜|税込|税率|対象額|クレジット|オンライン|Master|VISA|お釣|釣銭|預り|お預|ポイント|お支払|カード|決済|店\s*[:：]|レジ(?:No|番号|[:：]|\d)|電話|TEL|No\s*[:：])/i;
+  function summarizeLabel(text){
+    const s=cleanLine(text).replace(/\s+/g,'');
+    if(/小計/.test(s))return 'subtotal';
+    if(/(?:お買上|総|税込|支払)?合計/.test(s))return 'total';
+    if(/(?:10%|8%|税額|税抜|対象額|決済|Master|カード|クレジット)/i.test(s))return 'other';
+    return '';
+  }
+  function chooseNamesFromTsv(lines,cy,w){
+    const nearest=lines.filter(l=>Math.abs(l.cy-cy)<Math.max(28,w*.035))
+      .sort((a,b)=>Math.abs(a.cy-cy)-Math.abs(b.cy-cy));
+    return nearest[0]?.text||'';
+  }
+  function parseVisibleRow(line,ocrLeft,ocrRight,cy){
+    const original=cleanLine(line);
+    const leftClean=cleanLine(ocrLeft);
+    const rightClean=cleanLine(ocrRight);
+    const lineName=leftOfPrice(original);
+    const tsvName=leftOfPrice(leftClean);
+    const letterCount=s=>(s.match(/[ぁ-んァ-ヶ一-龥]/g)||[]).length;
+    const name=letterCount(lineName)>=letterCount(tsvName)?lineName:tsvName;
+    const guessedFromRight=rightmostPrice(rightClean);
+    const inlinePrice=rightmostPrice(original);
+    const amount=guessedFromRight??inlinePrice;
+    const label=summarizeLabel(name||original);
+    const quantity=(original+' '+leftClean).match(/[@＠]\s*[¥￥]?\d+\s*[xX×*]\s*(\d{1,2})\s*個?/);
+    return {cy,original,leftClean,rightClean,name,amount,label,quantity:quantity?Number(quantity[1]):null};
+  }
+  // 文字の位置から対応付けた行を、商品行・明細行・税込合計に分割する。
+  function interpretRows(lines,fallbackTotal){
+    const ordered=lines.slice().sort((a,b)=>a.cy-b.cy);
+    const items=[],diagnostics=[];
+    let subtotal=null,total=null,inSummary=false;
+    for(const r of ordered){
+      const name=r.name.trim();
+      if(r.label==='subtotal'){
+        inSummary=true;if(r.amount!==null)subtotal=r.amount;
+        diagnostics.push('小計 '+(r.amount===null?'未認識':yen(r.amount)));continue;
+      }
+      if(r.label==='total'){
+        inSummary=true;if(r.amount!==null)total=r.amount;
+        diagnostics.push('合計 '+(r.amount===null?'未認識':yen(r.amount)));continue;
+      }
+      if(r.label==='other'||NOT_ITEM.test(name))continue;
+      if(/[@＠]\s*\d+\s*[×xX*]\s*\d+/.test(name)){
+        if(items.length){const count=name.match(/[×xX*]\s*(\d+)/);if(count)items[items.length-1].quantity=String(Number(count[1]));}
+        continue;
+      }
+      if(inSummary || r.amount===null)continue;
+      // 金額だけ認識されても、商品名を勝手に推測しない。
+      const label=name.replace(/[¥￥]$/,'').trim();
+      const probable=label.length>=2&&/[ぁ-んァ-ヶ一-龥a-z]/i.test(label) && !/^\d+/.test(label);
+      const item=newRow(probable?label:'【要確認】商品名',r.amount,r.quantity||'1');
+      item.category=probable?guessCategory(label):'その他';
+      items.push(item);
+      diagnostics.push((probable?label:'商品名を認識できず')+' '+yen(r.amount));
+    }
+    if(total===null&&fallbackTotal!=='')total=Number(fallbackTotal);
+    return {items,subtotal,total,debug:diagnostics};
+  }
+  async function scan(){
+    if(isReading||!chosenFile)return;
+    isReading=true;$('readButton').disabled=true;$('progress').style.display='block';$('progress').value=0;
+    $('editor').style.display='none';$('positionDetails').style.display='none';$('alternateBox').style.display='none';
+    setStatus('文字と金額の位置を確認しています…');
+    try{
+      const source=await createCanvas(chosenFile);
+      const prepared=correctShadows(source);
+      const worker=await getWorker();
+      // OCRの文字と座標を取得。取得できなかった場合は価格列の画素から行候補を探す。
+      await worker.setParameters({tessedit_pageseg_mode:window.Tesseract.PSM.SPARSE_TEXT,
+        tessedit_char_whitelist:'',preserve_interword_spaces:'1'});
+      const full=await worker.recognize(prepared,{}, {tsv:true});
+      const raw=full.data?.text||'';
+      $('rawText').value=raw;
+      $('purchaseDate').value=detectDate(raw)||'';
+      const fullWords=rawTSVWords(full.data?.tsv);
+      const leftLines=groupWords(fullWords.filter(w=>w.x<prepared.width*.72));
+      // 数字は右半分を対象に別読み。左の商品名を数字の誤読で壊さない。
+      const priceCol=cropCanvas(prepared,.58,.92);
+      await worker.setParameters({tessedit_pageseg_mode:window.Tesseract.PSM.SINGLE_COLUMN,
+        tessedit_char_whitelist:'0123456789,¥￥',preserve_interword_spaces:'1'});
+      const priceOut=await worker.recognize(priceCol.canvas,{}, {tsv:true});
+      const priceWords=rawTSVWords(priceOut.data?.tsv,priceCol.offsetX);
+      const pixels=detectPriceRowsFromPixels(prepared);
+      const candidates=mergeCandidateRows(fullWords,priceWords,pixels,prepared.width,prepared.height);
+      const diagnostics=[];const scanned=[];
+      await worker.setParameters({tessedit_pageseg_mode:window.Tesseract.PSM.SINGLE_LINE,
+        tessedit_char_whitelist:'',preserve_interword_spaces:'1'});
+      const maxLines=20;
+      for(let i=0;i<Math.min(candidates.length,maxLines);i++){
+        const {cy}=candidates[i];
+        setStatus('商品名と金額を行ごとに確認しています… '+(i+1)+'/'+Math.min(candidates.length,maxLines));
+        const whole=cropBand(prepared,cy,.04,.92);
+        const output=await worker.recognize(whole);
+        const line=output.data?.text?.trim()||'';
+        const left=chooseNamesFromTsv(leftLines,cy,prepared.width)||'';
+        let maybe=parseVisibleRow(line,left,'',cy);
+        // 金額が文章に埋もれたとき、右側だけ数字を再認識する。
+        if(maybe.amount===null){
+          await worker.setParameters({tessedit_pageseg_mode:window.Tesseract.PSM.SINGLE_LINE,
+            tessedit_char_whitelist:'0123456789,¥￥',preserve_interword_spaces:'1'});
+          const nums=await worker.recognize(cropBand(prepared,cy,.61,.91));
+          maybe=parseVisibleRow(line,left,nums.data?.text||'',cy);
+          await worker.setParameters({tessedit_pageseg_mode:window.Tesseract.PSM.SINGLE_LINE,
+            tessedit_char_whitelist:'',preserve_interword_spaces:'1'});
+        }
+        scanned.push(maybe);
+        diagnostics.push(Math.round(cy)+'px '+(maybe.name||'(不明)')+' / '+(maybe.amount===null?'価格不明':yen(maybe.amount)));
+      }
+      const interpreted=interpretRows(scanned,detectTotal(raw));
+      const fallback=parseReceipt(raw);
+      draft=interpreted.items;
+      // 誤った大量の候補で上書きしない。本文の単純抽出が明確に多い場合は候補として使う。
+      if(fallback.length>draft.length && (draft.length===0 || fallback.length>draft.length+3)){draft=fallback;diagnostics.push('本文からの候補を採用');}
+      $('printedTotal').value=interpreted.total===null?'':String(interpreted.total);
+      drawRows();$('editor').style.display='block';
+      $('positionDetails').style.display='block';$('positionDetails').open=false;
+      $('positionDebug').textContent='行候補: '+candidates.length+'\n'+diagnostics.join('\n')+
+        '\n---- 読み取った文字 ----\n'+raw;
+      $('rawText').closest('details').open=false;
+      if(draft.length===0){setStatus('商品を自動で取り出せませんでした。写真の傾きや影を減らして再撮影してください。');}
+      else{
+        setStatus('商品候補 '+draft.length+'件。日付・商品名・金額を確認してください。'+(!$('purchaseDate').value?' 購入日は読み取れなかったため入力が必要です。':''));
+      }
+      $('editor').scrollIntoView({behavior:'smooth',block:'start'});
+    }catch(e){
+      console.error('レシートv5 OCR:',e);
+      setStatus('読み取りを完了できませんでした。通信状況を確認し、もう一度お試しください。');
+      $('editor').style.display='block';$('rawText').closest('details').open=false;
+      draft=[];drawRows();
+      $('positionDetails').style.display='block';$('positionDetails').open=false;
+      $('positionDebug').textContent='エラー詳細: '+(e?.message||String(e));
+    }finally{isReading=false;$('readButton').disabled=!chosenFile;$('progress').style.display='none';}
+  }
+  function selectFile(file){
+    if(!file)return;
+    if(!file.type.startsWith('image/')){setStatus('画像ファイルを選んでください。');return;}
+    chosenFile=file;alternateOCR='';$('alternateBox').style.display='none';
+    $('rawText').value='';$('printedTotal').value='';draft=[];
+    if(imageUrl)URL.revokeObjectURL(imageUrl);
+    imageUrl=URL.createObjectURL(file);$('preview').src=imageUrl;$('preview').style.display='block';
+    $('readButton').disabled=false;$('editor').style.display='none';setStatus('写真を選択しました。「文字を読み取る」を押してください。');
+  }
+  function renderHistory(){
+    const history=readHistory();$('history').style.display='block';
+    const todayDate=new Date(),dayIndex=(todayDate.getDay()+6)%7;
+    const weekStart=new Date(todayDate.getFullYear(),todayDate.getMonth(),todayDate.getDate()-dayIndex);
+    const monthStart=localDay(new Date(todayDate.getFullYear(),todayDate.getMonth(),1));
+    const startWeek=localDay(weekStart);
+    const total=h=>Number.isFinite(Number(h.paidTotal)) && h.paidTotal!==undefined && h.paidTotal!==null
+      ? Number(h.paidTotal) : h.items.reduce((n,i)=>n+Number(i.amount||0),0);
+    $('weekSum').textContent=yen(history.filter(x=>x.date>=startWeek&&x.date<=today()).reduce((s,x)=>s+total(x),0));
+    $('monthSum').textContent=yen(history.filter(x=>x.date>=monthStart&&x.date<=today()).reduce((s,x)=>s+total(x),0));
+    const box=$('historyRows');box.replaceChildren();
+    if(!history.length){const t=document.createElement('p');t.className='empty';t.textContent='まだ購入履歴がありません。最初のレシートを保存してみましょう。';box.append(t);return;}
+    history.sort((a,b)=>b.date.localeCompare(a.date)||b.savedAt.localeCompare(a.savedAt));
+    for(const receipt of history.slice(0,30)){
+      const card=document.createElement('div');card.className='receipt';
+      const top=document.createElement('div');top.className='head';
+      const title=document.createElement('strong');title.textContent=receipt.date+' のお買い物';
+      const amount=document.createElement('strong');amount.textContent=yen(total(receipt));
+      top.append(title,amount);card.append(top);
+      const det=document.createElement('details');const sum=document.createElement('summary');sum.textContent=`${receipt.items.length}商品を見る`;det.append(sum);
+      for(const i of receipt.items){
+        const line=document.createElement('div');line.className='line';
+        const n=document.createElement('span');n.textContent=`${i.name} × ${i.quantity}（${i.category}）`;
+        const a=document.createElement('span');a.textContent=yen(i.amount);line.append(n,a);det.append(line);
+      }
+      card.append(det);box.append(card);
+    }
+  }
+  function save(){
+    const date=$('purchaseDate').value;
+    if(!date){alert('購入日を入力してください。');return;}
+    if(!draft.length){alert('商品を1件以上登録してください。');return;}
+    const entries=[];
+    for(let i=0;i<draft.length;i++){
+      const row=draft[i],name=String(row.name).trim(),quantity=Number(row.quantity),amount=Number(row.amount);
+      if(name.includes('【要確認】')){alert(`${i+1}行目の商品名を修正してください。`);return;}
+      if(!name||!Number.isInteger(quantity)||quantity<1||!Number.isInteger(amount)||amount<0||String(row.amount).trim()===''){
+        alert(`${i+1}行目の商品名・数量・金額を確認してください。`);return;
+      }
+      entries.push({name,quantity,amount,category:row.category});
+    }
+    const printed=$('printedTotal').value;
+    if(printed!==''&&(!Number.isInteger(Number(printed))||Number(printed)<0)){
+      alert('税込の支払合計を確認してください。');return;
+    }
+    if(printed!==''&&Number(printed)!==entries.reduce((n,i)=>n+i.amount,0)){
+      if(!confirm('商品小計と税込支払合計は異なります。税金や値引きの分を確認しましたか？ この金額で保存しますか？'))return;
+    }
+    const record={id:(window.crypto&&crypto.randomUUID)?crypto.randomUUID():String(Date.now())+'-'+Math.random().toString(36).slice(2),date,savedAt:new Date().toISOString(),items:entries,paidTotal:printed===''?null:Number(printed)};
+    try{
+      const h=readHistory();h.push(record);localStorage.setItem(KEY,JSON.stringify(h));
+    }catch(e){alert('保存に失敗しました。端末の空き容量やブラウザの保存設定を確認してください。');return;}
+    renderHistory();$('history').scrollIntoView({behavior:'smooth',block:'start'});alert('購入履歴を保存しました！ 🐬');
+    // 複数回押した際の二重記録を防ぐ。新しい画像を選ぶと再度保存できる。
+    $('saveButton').disabled=true;
+    $('saveButton').textContent='保存済みです（次のレシートを選んでください）';
+  }
+  for(const id of ['cameraFile','photoFile'])$(id).addEventListener('change',e=>{
+    const f=e.target.files&&e.target.files[0];selectFile(f);e.target.value='';
+    $('saveButton').disabled=false;$('saveButton').textContent='内容を確認して購入履歴に保存';
+  });
+  $('readButton').addEventListener('click',scan);
+  $('parseButton').addEventListener('click',()=>{
+    draft=parseReceipt($('rawText').value);const d=detectDate($('rawText').value);if(d)$('purchaseDate').value=d;
+    const total=detectTotal($('rawText').value);if(total!=='')$('printedTotal').value=total;
+    drawRows();$('editor').style.display='block';setStatus('商品候補：'+draft.length+'件。内容を確認してください。');
+  });
+  $('useAlternate').addEventListener('click',()=>{
+    const old=$('rawText').value;applyRecognizedText(alternateOCR);
+    alternateOCR=old;$('alternateText').value=alternateOCR;
+    setStatus('別の読み取り結果へ切り替えました。商品名・金額を確認してください。');
+  });
+  $('addItem').addEventListener('click',()=>{draft.push(newRow());drawRows();});
+  $('printedTotal').addEventListener('input',updateTotal);
+  $('saveButton').addEventListener('click',save);
+  $('purchaseDate').value=today();renderHistory();
+})();
+</script>
+</body>
+</html>
