@@ -259,6 +259,24 @@ li button:last-child:hover {
 .stock-editor button { margin-top:10px; background:#83c694; }
 .stock-blank { font-size:13px; color:#6c7b6d; }
 @media(max-width:480px) { .stock-form-extra, .stock-editor-grid { grid-template-columns:1fr; } .stock-summary { flex:1 0 100%; } }
+
+/* レシートの受け渡し確認画面。既存の在庫保存処理と分離 */
+#receiptReviewPanel{display:none}
+.receipt-review{background:#f9fff8;border:1px solid #d9e8d6;border-radius:16px;padding:14px;margin:12px 0}
+.receipt-review .receipt-note{font-size:13px;line-height:1.7;color:#526b58}
+.receipt-review h2{margin:0 0 8px;color:#386f48;font-size:1.2rem}
+.receipt-row{border-top:1px solid #e3ece2;padding:10px 0;display:flex;justify-content:space-between;gap:10px;align-items:start}
+.receipt-row .receipt-name{font-weight:bold;flex:1;overflow-wrap:anywhere}
+.receipt-row .receipt-count{min-width:52px;text-align:right}
+.receipt-row .receipt-price{min-width:90px;text-align:right;color:#5e775f}
+.receipt-warning{background:#fff6df;border:1px solid #f2dcac;border-radius:10px;padding:10px 12px;line-height:1.6;font-size:13px;margin:12px 0}
+.receipt-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:15px}
+.receipt-actions button{flex:1;min-width:125px;min-height:48px}
+.receipt-actions .receipt-cancel{color:#42674b;background:#e9f2e8}
+#receiptReviewPanel p{line-height:1.6}
+.receipt-fallback{margin-top:15px;font-size:13px}
+.receipt-fallback input[type=file]{font-size:13px;max-width:100%}
+@media(max-width:420px){.receipt-row{flex-wrap:wrap}.receipt-row .receipt-name{flex:1 0 100%}.receipt-row .receipt-count,.receipt-row .receipt-price{text-align:left}.receipt-actions{flex-direction:column}}
 </style> 
 </head>
 <body>
@@ -296,6 +314,11 @@ li button:last-child:hover {
         </button>
       </div>
       <p class="home-note">まずは使える機能から。準備中の機能は、今後少しずつ追加します。</p>
+      <details class="receipt-fallback"><summary>OCR結果のJSONファイルを取り込む（予備）</summary>
+        <p>Macで読み取った結果をJSONファイルとして保存した場合はこちらから選べます。</p>
+        <input type="file" id="receiptImportFile" accept=".json,application/json">
+        <p id="receiptFileStatus" role="status"></p>
+      </details>
     </section>
 
     <section id="inventoryPanel" aria-label="在庫管理">
@@ -342,6 +365,22 @@ li button:last-child:hover {
       </details>
     </section>
 
+
+    <section id="receiptReviewPanel" aria-label="レシートの在庫登録確認">
+      <h2 style="color:#4c8b5a;font-size:1.35rem">🧾 レシートの登録確認</h2>
+      <p>Macで読み取った商品を確認します。まだ保存されていません。</p>
+      <div class="receipt-review">
+        <h2 id="receiptSummary">読み取った内容</h2>
+        <p id="receiptDetails" class="receipt-note"></p>
+        <div id="receiptReviewRows"></div>
+      </div>
+      <p class="receipt-warning">⚠️ レシートの文字認識に誤りがないことを、撮影した写真と照合してください。商品名・数量が違う場合は、元の撮影画面で修正してから送り直してください。価格は購入履歴に保存し、在庫の数量には加えません。</p>
+      <div class="receipt-actions">
+        <button id="receiptConfirmButton" type="button">確認して在庫・購入履歴へ登録</button>
+        <button id="receiptCancelButton" type="button" class="receipt-cancel">キャンセル（保存しない）</button>
+      </div>
+      <p id="receiptImportMessage" role="status"></p>
+    </section>
   </main>
 
   <script>
@@ -536,6 +575,130 @@ if (items.some(item => item.name === name.value.trim())) {
     };
 
     showItems();
+
+
+// Apple Visionの確認済み商品情報を、同じiPhoneのGitHub Pages版へ受け渡す。
+// URLの#以下はHTTPサーバーには送信されない。読み取った直後に履歴欄から消去する。
+const RECEIPT_HISTORY_KEY = 'stockAppPurchaseHistoryV1';
+const IMPORT_IDS_KEY = 'stockAppImportedReceiptIdsV1';
+let pendingReceipt = null;
+const receiptPanel = document.getElementById('receiptReviewPanel');
+const receiptYen = n => '¥' + Number(n).toLocaleString('ja-JP');
+
+function decodeReceiptData(encoded) {
+  if (!encoded || encoded.length > 26000 || !/^[A-Za-z0-9_-]+$/.test(encoded)) throw new Error('受け渡しデータが不正です');
+  const raw = atob(encoded.replace(/-/g,'+').replace(/_/g,'/') + '='.repeat((4-encoded.length%4)%4));
+  const bytes = Uint8Array.from(raw, c => c.charCodeAt(0));
+  return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
+}
+function validateReceipt(obj) {
+  if (!obj || obj.format !== 'stock-receipt-offline-v1' || obj.verified !== true || !Array.isArray(obj.items))
+    throw new Error('このアプリで扱えないレシートです');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(obj.date || '') || !Number.isInteger(obj.paidTotal) || obj.paidTotal < 0)
+    throw new Error('購入日または税込合計を確認してください');
+  if (!obj.items.length || obj.items.length > 80) throw new Error('商品件数を確認してください');
+  let totalItems = 0;
+  const entries = obj.items.map(item => {
+    const name = String(item.name || '').trim();
+    const quantity = Number(item.quantity), amount = Number(item.amount);
+    if (!name || name.length > 160 || !Number.isInteger(quantity) || quantity < 1 || quantity > 999 ||
+        !Number.isInteger(amount) || amount < 0 || amount > 50000000 || item.amount === '')
+      throw new Error('商品名・数量・金額に不正な値があります');
+    totalItems += quantity;
+    return { name, quantity, amount, category: item.category || '' };
+  });
+  if (totalItems > 3000) throw new Error('数量が多すぎます');
+  const tax = (obj.tax && typeof obj.tax === 'object')
+    ? Object.entries(obj.tax).filter(([k,v]) => k.startsWith('tax_') && Number.isInteger(Number(v)) && Number(v) >= 0)
+      .reduce((sum,[,v]) => sum + Number(v),0) : 0;
+  const receiptId = typeof obj.transferId === 'string' && /^[\w-]{8,100}$/.test(obj.transferId)
+    ? obj.transferId : 'file-' + obj.date + '-' + obj.paidTotal + '-' + entries.map(x=> x.name+'_'+x.quantity+'_'+x.amount).join('-');
+  return {receiptId, date:obj.date, paidTotal:obj.paidTotal, taxAmount:tax, items:entries};
+}
+function normalizedName(s) {return String(s || '').normalize('NFKC').replace(/\s+/g,'').toLowerCase();}
+function getSavedArray(key){ try {const value=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(value) ? value : [];} catch(e) {return [];} }
+function showReceiptReview(receipt) {
+  pendingReceipt=receipt;
+  homePanel.style.display='none';
+  inventoryPanel.style.display='none';
+  receiptPanel.style.display='block';
+  document.getElementById('receiptSummary').textContent=`${receipt.items.length}種類・${receipt.items.reduce((n,x)=>n+x.quantity,0)}点`;
+  document.getElementById('receiptDetails').textContent=`購入日：${receipt.date}　税込合計：${receiptYen(receipt.paidTotal)}`;
+  const box=document.getElementById('receiptReviewRows');box.replaceChildren();
+  receipt.items.forEach(entry=>{
+    const row=document.createElement('div');row.className='receipt-row';
+    const name=document.createElement('span');name.className='receipt-name';name.textContent=entry.name;
+    const quantity=document.createElement('span');quantity.className='receipt-count';quantity.textContent=`×${entry.quantity}`;
+    const price=document.createElement('span');price.className='receipt-price';price.textContent=receiptYen(entry.amount);
+    const already = items.some(x=>normalizedName(x.name)===normalizedName(entry.name));
+    if (already){name.textContent += '（在庫あり：数量に追加）';}
+    row.append(name,quantity,price);box.appendChild(row);
+  });
+  document.getElementById('receiptImportMessage').textContent='';
+  window.scrollTo(0,0);
+}
+function cancelReceiptReview(){pendingReceipt=null;receiptPanel.style.display='none';homePanel.style.display='block';window.scrollTo(0,0);}
+document.getElementById('receiptCancelButton').addEventListener('click',cancelReceiptReview);
+document.getElementById('receiptConfirmButton').addEventListener('click',()=>{
+  if (!pendingReceipt) return;
+  if(pendingQuantities.size){alert('在庫数量の未保存の変更があります。先に保存してください。');return;}
+  const receipt = pendingReceipt;
+  const alreadyImported = getSavedArray(IMPORT_IDS_KEY);
+  const oldHistory = getSavedArray(RECEIPT_HISTORY_KEY);
+  if (alreadyImported.includes(receipt.receiptId) || oldHistory.some(h=>h.id===receipt.receiptId)){
+    document.getElementById('receiptImportMessage').textContent='このレシートは既に登録されています。二重登録はしません。';return;
+  }
+  const priorItemsText=localStorage.getItem('items');
+  const priorHistoryText=localStorage.getItem(RECEIPT_HISTORY_KEY);
+  const priorIdsText=localStorage.getItem(IMPORT_IDS_KEY);
+  const updated = items.map(it=>({...it}));
+  for(const entry of receipt.items){
+    const index = updated.findIndex(it=>normalizedName(it.name)===normalizedName(entry.name));
+    if(index>=0){updated[index].quantity = Math.max(0,Number(updated[index].quantity)||0) + entry.quantity;}
+    else updated.push({name:entry.name,quantity:entry.quantity,category:
+      /日用品/.test(entry.category) ? 'daily' : guessCategory(entry.name),
+      purchasedAt:receipt.date,expiryDate:'',expiryType:''});
+  }
+  const record={id:receipt.receiptId,date:receipt.date,paidTotal:receipt.paidTotal,taxAmount:receipt.taxAmount,
+    savedAt:new Date().toISOString(),items:receipt.items};
+  try {
+    localStorage.setItem('items',JSON.stringify(updated));
+    localStorage.setItem(RECEIPT_HISTORY_KEY,JSON.stringify([...oldHistory,record]));
+    localStorage.setItem(IMPORT_IDS_KEY,JSON.stringify([...alreadyImported,receipt.receiptId].slice(-100)));
+  }catch(e){
+    try{for(const [key,value] of [['items',priorItemsText],[RECEIPT_HISTORY_KEY,priorHistoryText],[IMPORT_IDS_KEY,priorIdsText]]){
+      const actual=key==='RECEIPT_HISTORY_KEY'?RECEIPT_HISTORY_KEY:key==='IMPORT_IDS_KEY'?IMPORT_IDS_KEY:key;
+      if(value===null)localStorage.removeItem(actual);else localStorage.setItem(actual,value);
+    }}catch(ignore){}
+    alert('保存に失敗しました。ブラウザの保存設定または空き容量を確認してください。');return;
+  }
+  items.splice(0,items.length,...updated);showItems();
+  cancelReceiptReview();
+  document.getElementById('openInventoryButton').click();
+  alert(`${receipt.items.length}種類の購入履歴と在庫を登録しました。既存在庫は数量を加算しました。`);
+});
+
+// URLで渡す場合、ブラウザ履歴から商品情報をできるだけ早く消す。
+function consumeReceiptFromUrl(){
+  const match=window.location.hash.match(/^#receipt=([^&]+)$/);
+  if(!match)return;
+  try {history.replaceState(null,'',location.pathname+location.search);} catch(e){}
+  try {showReceiptReview(validateReceipt(decodeReceiptData(match[1])));}
+  catch(e){alert('レシートの受け渡しに失敗しました：'+e.message);}
+}
+consumeReceiptFromUrl();
+// ファイル選択は、URL受け渡しが利用できない場合の予備手段。
+const receiptFile = document.getElementById('receiptImportFile');
+receiptFile.addEventListener('change', async()=>{
+  const file=receiptFile.files?.[0];receiptFile.value='';if(!file)return;
+  const status = document.getElementById('receiptFileStatus');
+  try {
+    if(file.size>100000)throw new Error('JSONが大きすぎます');
+    showReceiptReview(validateReceipt(JSON.parse(await file.text())));
+    status.textContent='JSONを読み込みました。確認画面で登録してください。';
+  }catch(e){status.textContent='読み込めませんでした：'+e.message;}
+});
+
   </script>
 </body>
 </html>
