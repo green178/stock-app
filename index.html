@@ -277,6 +277,18 @@ li button:last-child:hover {
 .receipt-fallback{margin-top:15px;font-size:13px}
 .receipt-fallback input[type=file]{font-size:13px;max-width:100%}
 @media(max-width:420px){.receipt-row{flex-wrap:wrap}.receipt-row .receipt-name{flex:1 0 100%}.receipt-row .receipt-count,.receipt-row .receipt-price{text-align:left}.receipt-actions{flex-direction:column}}
+/* レシートごとの購入履歴。データの削除・上書きは行わない */
+#historyPanel{display:none}
+#historyBackButton{background:#e6f1e5;color:#416f4e;margin:8px 0 12px}
+.history-card{background:#fff;border:1px solid #ddebdc;border-radius:15px;padding:15px;margin:13px 0}
+.history-card h3{font-size:16px;color:#315e40;margin:0 0 8px;line-height:1.5}
+.history-card p{font-size:13px;line-height:1.6;margin:4px 0 10px}
+.history-card ul{padding:0;margin:10px 0 0}
+.history-card li{display:flex;justify-content:space-between;align-items:start;gap:12px;font-size:14px;padding:8px 0;border:0;border-bottom:1px solid #eff2ef;border-radius:0;margin:0}
+.history-card li span{flex:1;min-width:0;overflow-wrap:anywhere}
+.history-card li small{text-align:right;white-space:nowrap;color:#546e5b;font-size:13px}
+#historyEmpty{font-size:14px;line-height:1.7}
+.history-note{font-size:12px;line-height:1.7;color:#607463}
 </style> 
 </head>
 <body>
@@ -306,11 +318,11 @@ li button:last-child:hover {
           <span class="tile-desc">買い忘れを防ぐ</span>
           <span class="tile-status">準備中</span>
         </button>
-        <button class="home-tile tile-history" type="button" disabled>
-          <span class="tile-icon" aria-hidden="true">📊</span>
-          <span class="tile-name">購入履歴・グラフ</span>
-          <span class="tile-desc">支出を振り返る</span>
-          <span class="tile-status">準備中</span>
+        <button class="home-tile tile-history" id="openHistoryButton" type="button">
+          <span class="tile-icon" aria-hidden="true">🧾</span>
+          <span class="tile-name">購入履歴を見る</span>
+          <span class="tile-desc">レシートの記録を確認</span>
+          <span class="tile-status">グラフは準備中</span>
         </button>
       </div>
       <p class="home-note">まずは使える機能から。準備中の機能は、今後少しずつ追加します。</p>
@@ -365,6 +377,16 @@ li button:last-child:hover {
       </details>
     </section>
 
+
+    <section id="historyPanel" aria-label="購入履歴">
+      <button id="historyBackButton" type="button">← ホームに戻る</button>
+      <h2 style="color:#4c8b5a;font-size:1.25rem">🧾 購入履歴</h2>
+      <p>確認して登録したレシートの記録を表示します。</p>
+      <div id="historySummary" role="status"></div>
+      <p id="historyEmpty" hidden>まだ購入履歴がありません。レシートを読み取って登録すると、ここに表示されます。</p>
+      <div id="historyList"></div>
+      <p class="history-note">購入履歴は、このiPhoneのこのブラウザ内に保存されています。別の端末には自動で同期されず、ブラウザのデータを消すと失われる場合があります。</p>
+    </section>
 
     <section id="receiptReviewPanel" aria-label="レシートの在庫登録確認">
       <h2 style="color:#4c8b5a;font-size:1.35rem">🧾 レシートの登録確認</h2>
@@ -617,6 +639,42 @@ function validateReceipt(obj) {
 }
 function normalizedName(s) {return String(s || '').normalize('NFKC').replace(/\s+/g,'').toLowerCase();}
 function getSavedArray(key){ try {const value=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(value) ? value : [];} catch(e) {return [];} }
+// 登録済みレシートを「読み取り専用」で表示する。履歴や在庫は更新しない。
+function showPurchaseHistory(){
+  const historyRecords=getSavedArray(RECEIPT_HISTORY_KEY).filter(x=>x && typeof x==='object');
+  const historyPanel=document.getElementById('historyPanel');
+  homePanel.style.display='none';
+  inventoryPanel.style.display='none';
+  receiptPanel.style.display='none';
+  historyPanel.style.display='block';
+  document.getElementById('historyEmpty').hidden=historyRecords.length>0;
+  document.getElementById('historySummary').textContent=`保存済みレシート：${historyRecords.length}件`;
+  const list=document.getElementById('historyList');list.replaceChildren();
+  // 保存済みの登録日時があれば新しい順に並べる。読み取り専用のため元データには触れない。
+  const ordered=[...historyRecords].sort((a,b)=>String(b.savedAt||'').localeCompare(String(a.savedAt||'')));
+  ordered.forEach(record=>{
+    const card=document.createElement('article');card.className='history-card';
+    const head=document.createElement('h3');
+    head.textContent=`${record.date||'購入日未設定'}　税込合計 ${Number.isFinite(Number(record.paidTotal)) ? receiptYen(record.paidTotal) : '未確認'}`;
+    const items=Array.isArray(record.items)?record.items:[];
+    const summary=document.createElement('p');summary.textContent=`${items.length}種類・${items.reduce((n,it)=>n+(Number(it.quantity)||0),0)}点`;
+    const ul=document.createElement('ul');
+    items.forEach(item=>{
+      const li=document.createElement('li');
+      const name=document.createElement('span');name.textContent=String(item.name||'商品名未設定');
+      const price=document.createElement('small');price.textContent=`×${item.quantity||1}　${receiptYen(item.amount||0)}`;
+      li.append(name,price);ul.appendChild(li);
+    });
+    card.append(head,summary,ul);list.appendChild(card);
+  });
+  window.scrollTo(0,0);
+}
+document.getElementById('openHistoryButton').addEventListener('click',showPurchaseHistory);
+document.getElementById('historyBackButton').addEventListener('click',()=>{
+  document.getElementById('historyPanel').style.display='none';
+  homePanel.style.display='block';
+  window.scrollTo(0,0);
+});
 function showReceiptReview(receipt) {
   pendingReceipt=receipt;
   homePanel.style.display='none';
